@@ -14,7 +14,7 @@ type ResponseDecoder interface {
 }
 
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
-type WatchInterface[T corev1.Object] interface {
+type WatchInterface[T interface{}] interface {
 	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
 	// any resources used by the Watch.
 	Stop()
@@ -27,7 +27,7 @@ type WatchInterface[T corev1.Object] interface {
 
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a Watch.Interface.
-type streamWatcher[T corev1.Object] struct {
+type streamWatcher[T interface{}] struct {
 	result  chan corev1.Event[T]
 	r       io.ReadCloser
 	log     Logger
@@ -37,7 +37,7 @@ type streamWatcher[T corev1.Object] struct {
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given io.ReadClosers.
-func newStreamWatcher[T corev1.Object](r io.ReadCloser, log Logger, decoder ResponseDecoder) WatchInterface[T] {
+func newStreamWatcher[T interface{}](r io.ReadCloser, log Logger, decoder ResponseDecoder) WatchInterface[T] {
 	sw := &streamWatcher[T]{
 		r:       r,
 		log:     log,

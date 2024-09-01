@@ -14,19 +14,10 @@ const (
 )
 
 // Event represents a single event to a watched resource.
-type Event[T Object] struct {
+type Event[T interface{}] struct {
 	Type   EventType `json:"type"`
 	Object *T        `json:"object"`
 }
-
-// Object is kubernetes object.
-type Object interface {
-	GetObjectMeta() metav1.ObjectMeta
-	GetTypeMeta() metav1.TypeMeta
-	GVR() metav1.GroupVersionResource
-}
-
-var _ Object = (*Endpoints)(nil)
 
 type Endpoints struct {
 	metav1.TypeMeta   `json:",inline"`
