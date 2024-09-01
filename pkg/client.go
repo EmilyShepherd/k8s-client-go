@@ -104,6 +104,9 @@ type DefaultClient struct {
 }
 
 func (kc *DefaultClient) Do(req *http.Request) (*http.Response, error) {
+	if token := kc.Token(); len(token) > 0 {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	return kc.HttpClient.Do(req)
 }
 

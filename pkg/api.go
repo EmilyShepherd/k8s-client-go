@@ -72,7 +72,7 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
 	var t T
 	reqURL := o.buildRequestURL(namespace, name)
-	req, err := o.getRequest(reqURL)
+	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, e
 
 func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
 	reqURL := o.buildRequestURL(namespace, name) + "?watch"
-	req, err := o.getRequest(reqURL)
+	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -107,15 +107,4 @@ func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (ty
 		return nil, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
 	}
 	return newStreamWatcher[T](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
-}
-
-func (o *objectAPI[T]) getRequest(url string) (*http.Request, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	if token := o.kc.Token(); len(token) > 0 {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	return req, nil
 }
