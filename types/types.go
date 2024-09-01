@@ -1,9 +1,5 @@
 package types
 
-import (
-	"context"
-)
-
 // GetOptions is reserved to be implemented.
 type GetOptions struct {
 }
@@ -47,12 +43,12 @@ type WatchInterface[T interface{}] interface {
 
 // ObjectGetter is generic object getter.
 type ObjectGetter[T interface{}] interface {
-	Get(ctx context.Context, namespace, name string, _ GetOptions) (*T, error)
+	Get(namespace, name string, _ GetOptions) (*T, error)
 }
 
 // ObjectWatcher is generic object watcher.
 type ObjectWatcher[T interface{}] interface {
-	Watch(ctx context.Context, namespace, name string, _ ListOptions) (WatchInterface[T], error)
+	Watch(namespace, name string, _ ListOptions) (WatchInterface[T], error)
 }
 
 // ObjectAPI wraps all operations on object.

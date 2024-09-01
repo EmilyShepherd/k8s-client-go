@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,10 +69,10 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, name)
 }
 
-func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts types.GetOptions) (*T, error) {
+func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
 	var t T
 	reqURL := o.buildRequestURL(namespace, name)
-	req, err := o.getRequest(ctx, reqURL)
+	req, err := o.getRequest(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +91,9 @@ func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts typ
 	return &t, err
 }
 
-func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
+func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
 	reqURL := o.buildRequestURL(namespace, name) + "?watch"
-	req, err := o.getRequest(ctx, reqURL)
+	req, err := o.getRequest(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +109,8 @@ func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts t
 	return newStreamWatcher[T](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
 }
 
-func (o *objectAPI[T]) getRequest(ctx context.Context, url string) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func (o *objectAPI[T]) getRequest(url string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
