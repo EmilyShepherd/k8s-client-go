@@ -55,7 +55,7 @@ type objectAPI[T corev1.Object] struct {
 	opts objectAPIOptions
 }
 
-func buildRequestURL(apiServerURL string, gvr metav1.GroupVersionResource, namespace, name string) string {
+func (o *objectAPI[T]) buildRequestURL(gvr metav1.GroupVersionResource, namespace, name string) string {
 	var gvrPath string
 	if gvr.Group == "" {
 		gvrPath = path.Join("api", gvr.Version)
@@ -66,12 +66,12 @@ func buildRequestURL(apiServerURL string, gvr metav1.GroupVersionResource, names
 	if namespace != "" {
 		nsPath = path.Join("namespaces", namespace)
 	}
-	return apiServerURL + "/" + path.Join(gvrPath, nsPath, gvr.Resource, name)
+	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, gvr.Resource, name)
 }
 
 func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts metav1.GetOptions) (*T, error) {
 	var t T
-	reqURL := buildRequestURL(o.kc.APIServerURL(), t.GVR(), namespace, name)
+	reqURL := o.buildRequestURL(t.GVR(), namespace, name)
 	req, err := o.getRequest(ctx, reqURL)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts met
 
 func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts metav1.ListOptions) (WatchInterface[T], error) {
 	var t T
-	reqURL := buildRequestURL(o.kc.APIServerURL(), t.GVR(), namespace, name) + "?watch"
+	reqURL := o.buildRequestURL(t.GVR(), namespace, name) + "?watch"
 	req, err := o.getRequest(ctx, reqURL)
 	if err != nil {
 		return nil, err
