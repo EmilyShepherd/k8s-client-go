@@ -93,7 +93,7 @@ func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts met
 
 func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts metav1.ListOptions) (WatchInterface[T], error) {
 	var t T
-	reqURL := buildRequestURL(o.kc.APIServerURL(), t.GVR(), namespace, name)
+	reqURL := buildRequestURL(o.kc.APIServerURL(), t.GVR(), namespace, name) + "?watch"
 	req, err := o.getRequest(ctx, reqURL)
 	if err != nil {
 		return nil, err
