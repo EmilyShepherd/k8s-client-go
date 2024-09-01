@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"path"
 
-	metav1 "github.com/EmilyShepherd/k8s-client-go/types/meta/v1"
+	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
@@ -32,7 +32,7 @@ func WithResponseDecoder(decoderFunc ResponseDecoderFunc) ObjectAPIOption {
 	}
 }
 
-func NewObjectAPI[T interface{}](kc Interface, gvr metav1.GroupVersionResource, opt ...ObjectAPIOption) ObjectAPI[T] {
+func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T] {
 	opts := objectAPIOptions{
 		log: &DefaultLogger{},
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
@@ -53,7 +53,7 @@ func NewObjectAPI[T interface{}](kc Interface, gvr metav1.GroupVersionResource, 
 type objectAPI[T interface{}] struct {
 	kc   Interface
 	opts objectAPIOptions
-	gvr  metav1.GroupVersionResource
+	gvr  types.GroupVersionResource
 }
 
 func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
@@ -70,7 +70,7 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, name)
 }
 
-func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts metav1.GetOptions) (*T, error) {
+func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts types.GetOptions) (*T, error) {
 	var t T
 	reqURL := o.buildRequestURL(namespace, name)
 	req, err := o.getRequest(ctx, reqURL)
@@ -92,7 +92,7 @@ func (o *objectAPI[T]) Get(ctx context.Context, namespace, name string, opts met
 	return &t, err
 }
 
-func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts metav1.ListOptions) (WatchInterface[T], error) {
+func (o *objectAPI[T]) Watch(ctx context.Context, namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
 	reqURL := o.buildRequestURL(namespace, name) + "?watch"
 	req, err := o.getRequest(ctx, reqURL)
 	if err != nil {

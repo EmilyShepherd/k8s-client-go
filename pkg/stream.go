@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	corev1 "github.com/EmilyShepherd/k8s-client-go/types/core/v1"
+	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
 // ResponseDecoder allows to specify custom JSON response decoder. By default, std json decoder is used.
@@ -13,22 +13,10 @@ type ResponseDecoder interface {
 	Decode(v any) error
 }
 
-// WatchInterface can be implemented by anything that knows how to Watch and report changes.
-type WatchInterface[T interface{}] interface {
-	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
-	// any resources used by the Watch.
-	Stop()
-
-	// ResultChan returns a chan which will receive all the events. If an error occurs
-	// or Stop() is called, this channel will be closed, in which case the
-	// Watch should be completely cleaned up.
-	ResultChan() <-chan corev1.Event[T]
-}
-
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a Watch.Interface.
 type streamWatcher[T interface{}] struct {
-	result  chan corev1.Event[T]
+	result  chan types.Event[T]
 	r       io.ReadCloser
 	log     Logger
 	decoder ResponseDecoder
@@ -37,19 +25,19 @@ type streamWatcher[T interface{}] struct {
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given io.ReadClosers.
-func newStreamWatcher[T interface{}](r io.ReadCloser, log Logger, decoder ResponseDecoder) WatchInterface[T] {
+func newStreamWatcher[T interface{}](r io.ReadCloser, log Logger, decoder ResponseDecoder) types.WatchInterface[T] {
 	sw := &streamWatcher[T]{
 		r:       r,
 		log:     log,
 		decoder: decoder,
-		result:  make(chan corev1.Event[T]),
+		result:  make(chan types.Event[T]),
 	}
 	go sw.receive()
 	return sw
 }
 
 // ResultChan implements Interface.
-func (sw *streamWatcher[T]) ResultChan() <-chan corev1.Event[T] {
+func (sw *streamWatcher[T]) ResultChan() <-chan types.Event[T] {
 	return sw.result
 }
 
@@ -97,13 +85,13 @@ func (sw *streamWatcher[T]) receive() {
 
 // Decode blocks until it can return the next object in the writer. Returns an error
 // if the writer is closed or an object can't be decoded.
-func (sw *streamWatcher[T]) Decode() (corev1.Event[T], error) {
-	var t corev1.Event[T]
+func (sw *streamWatcher[T]) Decode() (types.Event[T], error) {
+	var t types.Event[T]
 	if err := sw.decoder.Decode(&t); err != nil {
 		return t, err
 	}
 	switch t.Type {
-	case corev1.EventTypeAdded, corev1.EventTypeModified, corev1.EventTypeDeleted, corev1.EventTypeError:
+	case types.EventTypeAdded, types.EventTypeModified, types.EventTypeDeleted, types.EventTypeError:
 		return t, nil
 	default:
 		return t, fmt.Errorf("got invalid Watch event type: %v", t.Type)
