@@ -1,4 +1,4 @@
-module github.com/castai/k8s-client-go
+module github.com/EmilyShepherd/k8s-client-go
 
 go 1.18
 

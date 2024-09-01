@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	corev1 "github.com/castai/k8s-client-go/types/core/v1"
-	metav1 "github.com/castai/k8s-client-go/types/meta/v1"
+	corev1 "github.com/EmilyShepherd/k8s-client-go/types/core/v1"
+	metav1 "github.com/EmilyShepherd/k8s-client-go/types/meta/v1"
 )
 
 func TestClientAPIGet(t *testing.T) {

@@ -3,7 +3,7 @@ module conformance
 go 1.18
 
 require (
-	github.com/castai/k8s-client-go v0.0.0
+	github.com/EmilyShepherd/k8s-client-go v0.0.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
@@ -49,4 +49,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace github.com/castai/k8s-client-go v0.0.0 => ../
+replace github.com/EmilyShepherd/k8s-client-go v0.0.0 => ../

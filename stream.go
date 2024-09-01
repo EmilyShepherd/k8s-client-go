@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	corev1 "github.com/castai/k8s-client-go/types/core/v1"
+	corev1 "github.com/EmilyShepherd/k8s-client-go/types/core/v1"
 )
 
 // ResponseDecoder allows to specify custom JSON response decoder. By default, std json decoder is used.

@@ -1,7 +1,7 @@
 package v1
 
 import (
-	metav1 "github.com/castai/k8s-client-go/types/meta/v1"
+	metav1 "github.com/EmilyShepherd/k8s-client-go/types/meta/v1"
 )
 
 type EventType string

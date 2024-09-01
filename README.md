@@ -5,7 +5,7 @@ Minimal Go Kubernetes client based on Generics
 ## Installing
 
 ```
-go get github.com/castai/k8s-client-go
+go get github.com/EmilyShepherd/k8s-client-go
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ import (
     "context"
     "log"
     "fmt"
-    client "github.com/castai/k8s-client-go"
+    client "github.com/EmilyShepherd/k8s-client-go"
 )
 func main() {
 	kc, err := client.NewInCluster()
@@ -44,7 +44,7 @@ func main() {
 }
 ```
 
-See more in [Examples](https://github.com/castai/k8s-client-go/blob/master/client_example_test.go#L10)
+See more in [Examples](https://github.com/EmilyShepherd/k8s-client-go/blob/master/client_example_test.go#L10)
 
 ## Use cases
 

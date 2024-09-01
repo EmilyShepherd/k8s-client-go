@@ -14,9 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	client "github.com/castai/k8s-client-go"
-	clientcorev1 "github.com/castai/k8s-client-go/types/core/v1"
-	clientmetav1 "github.com/castai/k8s-client-go/types/meta/v1"
+	client "github.com/EmilyShepherd/k8s-client-go"
+	clientcorev1 "github.com/EmilyShepherd/k8s-client-go/types/core/v1"
+	clientmetav1 "github.com/EmilyShepherd/k8s-client-go/types/meta/v1"
 )
 
 const (
