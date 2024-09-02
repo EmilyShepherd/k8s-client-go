@@ -29,6 +29,10 @@ type Event[T interface{}] struct {
 	Object *T        `json:"object"`
 }
 
+type List[T interface{}] struct {
+	Items []T `json:"items"`
+}
+
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
 type WatchInterface[T interface{}] interface {
 	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
@@ -55,4 +59,5 @@ type ObjectWatcher[T interface{}] interface {
 type ObjectAPI[T interface{}] interface {
 	ObjectGetter[T]
 	ObjectWatcher[T]
+	List(namespace string, _ ListOptions) (*List[T], error)
 }

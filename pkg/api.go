@@ -88,18 +88,33 @@ func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string) (*http.Respons
 	return resp, nil
 }
 
-func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
+func (o *objectAPI[T]) getAndUnmarshal(item interface{}, namespace, name string) error {
 	resp, err := o.do("GET", namespace, name, "")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
+	if err := o.opts.responseDecodeFunc(resp.Body).Decode(item); err != nil {
+		return err
+	}
+	return err
+}
+
+func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
 	var t T
-	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
+	if err := o.getAndUnmarshal(&t, namespace, name); err != nil {
 		return nil, err
 	}
-	return &t, err
+	return &t, nil
+}
+
+func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.List[T], error) {
+	var t types.List[T]
+	if err := o.getAndUnmarshal(&t, namespace, ""); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
 func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
