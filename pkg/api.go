@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
@@ -66,7 +67,7 @@ type objectAPI[T interface{}] struct {
 	gvr  types.GroupVersionResource
 }
 
-func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
+func (o *objectAPI[T]) buildRequestURL(r ResourceRequest) string {
 	var gvrPath string
 	if o.gvr.Group == "" {
 		gvrPath = path.Join("api", o.gvr.Version)
@@ -74,15 +75,29 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 		gvrPath = path.Join("apis", o.gvr.Group, o.gvr.Version)
 	}
 	var nsPath string
-	if namespace != "" {
-		nsPath = path.Join("namespaces", namespace)
+	if r.Namespace != "" {
+		nsPath = path.Join("namespaces", r.Namespace)
 	}
-	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, name)
+	url := o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, r.Name)
+
+	if len(r.Extra) > 0 {
+		url += "?" + strings.Join(r.Extra, "&")
+	}
+
+	return url
 }
 
-func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string, r io.Reader, headers ...Header) (*http.Response, error) {
-	reqURL := o.buildRequestURL(namespace, name) + urlExtra
-	req, err := http.NewRequest(verb, reqURL, r)
+type ResourceRequest struct {
+	Verb      string
+	Namespace string
+	Name      string
+	Extra     []string
+	Body      io.Reader
+}
+
+func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response, error) {
+	reqURL := o.buildRequestURL(r)
+	req, err := http.NewRequest(r.Verb, reqURL, r.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +118,10 @@ func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string, r io.Reader, h
 }
 
 func (o *objectAPI[T]) getAndUnmarshal(item interface{}, namespace, name string) error {
-	resp, err := o.do("GET", namespace, name, "", nil)
+	resp, err := o.do(ResourceRequest{
+		Namespace: namespace,
+		Name:      name,
+	})
 	if err != nil {
 		return err
 	}
@@ -134,12 +152,18 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
 	s, _ := json.Marshal(item)
 
-	extra := "?fieldManager=" + fieldManager
+	extra := []string{"fieldManager=" + fieldManager}
 	if force {
-		extra += "&force"
+		extra = append(extra, "force")
 	}
 
-	resp, err := o.do("PATCH", namespace, name, extra, bytes.NewReader(s), ApplyPatchHeader)
+	resp, err := o.do(ResourceRequest{
+		Verb:      "PATCH",
+		Namespace: namespace,
+		Name:      name,
+		Extra:     extra,
+		Body:      bytes.NewReader(s),
+	}, ApplyPatchHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +176,11 @@ func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, i
 }
 
 func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
-	resp, err := o.do("GET", namespace, name, "?watch", nil)
+	resp, err := o.do(ResourceRequest{
+		Namespace: namespace,
+		Name:      name,
+		Extra:     []string{"watch"},
+	})
 	if err != nil {
 		return nil, err
 	}
