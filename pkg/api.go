@@ -108,7 +108,7 @@ func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response,
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 226 {
 		defer resp.Body.Close()
 		errmsg, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
