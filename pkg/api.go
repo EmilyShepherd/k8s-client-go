@@ -69,31 +69,9 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, name)
 }
 
-func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
-	var t T
-	reqURL := o.buildRequestURL(namespace, name)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := o.kc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		errmsg, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
-	}
-	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
-		return nil, err
-	}
-	return &t, err
-}
-
-func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
-	reqURL := o.buildRequestURL(namespace, name) + "?watch"
-	req, err := http.NewRequest("GET", reqURL, nil)
+func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string) (*http.Response, error) {
+	reqURL := o.buildRequestURL(namespace, name) + urlExtra
+	req, err := http.NewRequest(verb, reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +83,29 @@ func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (ty
 		defer resp.Body.Close()
 		errmsg, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
+	}
+
+	return resp, nil
+}
+
+func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
+	resp, err := o.do("GET", namespace, name, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var t T
+	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
+		return nil, err
+	}
+	return &t, err
+}
+
+func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
+	resp, err := o.do("GET", namespace, name, "?watch")
+	if err != nil {
+		return nil, err
 	}
 	return newStreamWatcher[T](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
 }
