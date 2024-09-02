@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,16 @@ import (
 
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
+
+type Header struct {
+	Name  string
+	Value string
+}
+
+var ApplyPatchHeader = Header{
+	Name:  "content-type",
+	Value: "application/apply-patch+yaml",
+}
 
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
@@ -69,11 +80,14 @@ func (o *objectAPI[T]) buildRequestURL(namespace, name string) string {
 	return o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, name)
 }
 
-func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string) (*http.Response, error) {
+func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string, r io.Reader, headers ...Header) (*http.Response, error) {
 	reqURL := o.buildRequestURL(namespace, name) + urlExtra
-	req, err := http.NewRequest(verb, reqURL, nil)
+	req, err := http.NewRequest(verb, reqURL, r)
 	if err != nil {
 		return nil, err
+	}
+	for _, header := range headers {
+		req.Header.Set(header.Name, header.Value)
 	}
 	resp, err := o.kc.Do(req)
 	if err != nil {
@@ -89,7 +103,7 @@ func (o *objectAPI[T]) do(verb, namespace, name, urlExtra string) (*http.Respons
 }
 
 func (o *objectAPI[T]) getAndUnmarshal(item interface{}, namespace, name string) error {
-	resp, err := o.do("GET", namespace, name, "")
+	resp, err := o.do("GET", namespace, name, "", nil)
 	if err != nil {
 		return err
 	}
@@ -117,8 +131,28 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 	return &t, nil
 }
 
+func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
+	s, _ := json.Marshal(item)
+
+	extra := "?fieldManager=" + fieldManager
+	if force {
+		extra += "&force"
+	}
+
+	resp, err := o.do("PATCH", namespace, name, extra, bytes.NewReader(s), ApplyPatchHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	var t T
+	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
-	resp, err := o.do("GET", namespace, name, "?watch")
+	resp, err := o.do("GET", namespace, name, "?watch", nil)
 	if err != nil {
 		return nil, err
 	}

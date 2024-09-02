@@ -60,4 +60,5 @@ type ObjectAPI[T interface{}] interface {
 	ObjectGetter[T]
 	ObjectWatcher[T]
 	List(namespace string, _ ListOptions) (*List[T], error)
+	Apply(namespace, name, fieldManager string, force bool, item T) (*T, error)
 }
