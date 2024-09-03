@@ -22,6 +22,10 @@ var ApplyPatchHeader = Header{
 	Name:  "content-type",
 	Value: "application/apply-patch+yaml",
 }
+var MergePatchHeader = Header{
+	Name:  "content-type",
+	Value: "application/merge-patch+json",
+}
 
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
@@ -149,7 +153,7 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 	return &t, nil
 }
 
-func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
+func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (*T, error) {
 	s, _ := json.Marshal(item)
 
 	extra := []string{"fieldManager=" + fieldManager}
@@ -163,7 +167,7 @@ func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, i
 		Name:      name,
 		Extra:     extra,
 		Body:      bytes.NewReader(s),
-	}, ApplyPatchHeader)
+	}, h)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +177,14 @@ func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, i
 		return nil, err
 	}
 	return &t, nil
+}
+
+func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
+	return o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
+}
+
+func (o *objectAPI[T]) Patch(namespace, name, fieldManager string, item T) (*T, error) {
+	return o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
 }
 
 func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
