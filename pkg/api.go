@@ -66,9 +66,10 @@ func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, o
 }
 
 type objectAPI[T interface{}] struct {
-	kc   Interface
-	opts objectAPIOptions
-	gvr  types.GroupVersionResource
+	kc          Interface
+	opts        objectAPIOptions
+	gvr         types.GroupVersionResource
+	subresource string
 }
 
 func (o *objectAPI[T]) buildRequestURL(r ResourceRequest) string {
@@ -82,7 +83,7 @@ func (o *objectAPI[T]) buildRequestURL(r ResourceRequest) string {
 	if r.Namespace != "" {
 		nsPath = path.Join("namespaces", r.Namespace)
 	}
-	url := o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, r.Name)
+	url := o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, r.Name, o.subresource)
 
 	if len(r.Extra) > 0 {
 		url += "?" + strings.Join(r.Extra, "&")
@@ -97,6 +98,17 @@ type ResourceRequest struct {
 	Name      string
 	Extra     []string
 	Body      io.Reader
+}
+
+func (o *objectAPI[T]) Subresource(subresource string) types.ObjectAPI[T] {
+	newO := o
+	newO.subresource = subresource
+
+	return newO
+}
+
+func (o *objectAPI[T]) Status() types.ObjectAPI[T] {
+	return o.Subresource("status")
 }
 
 func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response, error) {
