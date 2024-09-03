@@ -165,6 +165,24 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 	return &t, nil
 }
 
+func (o *objectAPI[T]) Create(namespace string, item T) (*T, error) {
+	s, _ := json.Marshal(item)
+	resp, err := o.do(ResourceRequest{
+		Verb:      "POST",
+		Namespace: namespace,
+		Body:      bytes.NewReader(s),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var t T
+	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (*T, error) {
 	s, _ := json.Marshal(item)
 
