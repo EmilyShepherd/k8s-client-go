@@ -4,8 +4,23 @@ package types
 type GetOptions struct {
 }
 
+const (
+	Equals      = "%3D"
+	Exists      = "Exists"
+	LessThan    = "lt"
+	GreaterThan = "gt"
+	NotEquals   = "%21%3D"
+)
+
+type LabelSelector struct {
+	Label    string
+	Value    string
+	Operator string
+}
+
 // ListOptions is reserved to be implemented.
 type ListOptions struct {
+	LabelSelector []LabelSelector
 }
 
 type GroupVersionResource struct {

@@ -156,9 +156,19 @@ func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, e
 }
 
 func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.List[T], error) {
+	extra := make([]string, len(opts.LabelSelector))
+	for _, label := range opts.LabelSelector {
+		if label.Operator == types.Exists {
+			extra = append(extra, "labelSelector="+label.Label)
+		} else {
+			extra = append(extra, "labelSelector="+label.Label+label.Operator+label.Value)
+		}
+	}
+
 	var t types.List[T]
 	return &t, o.doAndUnmarshal(&t, ResourceRequest{
 		Namespace: namespace,
+		Extra:     extra,
 	})
 }
 
