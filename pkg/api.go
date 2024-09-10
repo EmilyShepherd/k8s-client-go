@@ -101,10 +101,10 @@ type ResourceRequest struct {
 }
 
 func (o *objectAPI[T]) Subresource(subresource string) types.ObjectAPI[T] {
-	newO := o
+	newO := *o
 	newO.subresource = subresource
 
-	return newO
+	return &newO
 }
 
 func (o *objectAPI[T]) Status() types.ObjectAPI[T] {
