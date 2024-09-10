@@ -133,14 +133,12 @@ func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response,
 	return resp, nil
 }
 
-func (o *objectAPI[T]) getAndUnmarshal(item interface{}, namespace, name string) error {
-	resp, err := o.do(ResourceRequest{
-		Namespace: namespace,
-		Name:      name,
-	})
+func (o *objectAPI[T]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) error {
+	resp, err := o.do(req, headers...)
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
 
 	if err := o.opts.responseDecodeFunc(resp.Body).Decode(item); err != nil {
@@ -151,36 +149,27 @@ func (o *objectAPI[T]) getAndUnmarshal(item interface{}, namespace, name string)
 
 func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
 	var t T
-	if err := o.getAndUnmarshal(&t, namespace, name); err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+		Namespace: namespace,
+		Name:      name,
+	})
 }
 
 func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.List[T], error) {
 	var t types.List[T]
-	if err := o.getAndUnmarshal(&t, namespace, ""); err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+		Namespace: namespace,
+	})
 }
 
 func (o *objectAPI[T]) Create(namespace string, item T) (*T, error) {
 	s, _ := json.Marshal(item)
-	resp, err := o.do(ResourceRequest{
+	var t T
+	return &t, o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "POST",
 		Namespace: namespace,
 		Body:      bytes.NewReader(s),
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	var t T
-	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
-		return nil, err
-	}
-	return &t, nil
 }
 
 func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (*T, error) {
@@ -191,22 +180,14 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 		extra = append(extra, "force")
 	}
 
-	resp, err := o.do(ResourceRequest{
+	var t T
+	return &t, o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
 		Extra:     extra,
 		Body:      bytes.NewReader(s),
 	}, h)
-	if err != nil {
-		return nil, err
-	}
-
-	var t T
-	if err := o.opts.responseDecodeFunc(resp.Body).Decode(&t); err != nil {
-		return nil, err
-	}
-	return &t, nil
 }
 
 func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
