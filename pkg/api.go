@@ -200,6 +200,22 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 	}, h)
 }
 
+func (o *objectAPI[T]) Delete(namespace, name string, force bool) error {
+	extra := []string{}
+	if force {
+		extra = append(extra, "force")
+	}
+
+	_, err := o.do(ResourceRequest{
+		Verb:      "DELETE",
+		Namespace: namespace,
+		Name:      name,
+		Extra:     extra,
+	})
+
+	return err
+}
+
 func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
 	return o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
 }

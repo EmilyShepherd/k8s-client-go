@@ -78,6 +78,7 @@ type ObjectAPI[T interface{}] interface {
 	Apply(namespace, name, fieldManager string, force bool, item T) (*T, error)
 	Patch(namespace, name, fieldManager string, item T) (*T, error)
 	Create(namespace string, item T) (*T, error)
+	Delete(namespace, name string, force bool) error
 	Subresource(subresource string) ObjectAPI[T]
 	Status() ObjectAPI[T]
 }
