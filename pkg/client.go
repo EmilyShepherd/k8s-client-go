@@ -32,7 +32,7 @@ func NewInCluster() (*DefaultClient, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
-	token, err := token.NewFileToken(serviceAccountToken)
+	tp, err := token.NewFileToken(serviceAccountToken)
 	if err != nil {
 		return nil, err
 	}
@@ -40,18 +40,25 @@ func NewInCluster() (*DefaultClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return NewClient("https://"+net.JoinHostPort(host, port), tp, ca)
+}
+
+func NewClient(host string, tp token.TokenProvider, ca []byte) (*DefaultClient, error) {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(ca)
 	transport := &http.Transport{TLSClientConfig: &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		RootCAs:    certPool,
 	}}
-	httpClient := &http.Client{Transport: transport, Timeout: time.Nanosecond * 0}
 
 	return &DefaultClient{
-		apiServerURL: "https://" + net.JoinHostPort(host, port),
-		token:        token,
-		HttpClient:   httpClient,
+		apiServerURL: host,
+		token:        tp,
+		HttpClient: &http.Client{
+			Transport: transport,
+			Timeout:   time.Nanosecond * 0,
+		},
 	}, nil
 }
 
