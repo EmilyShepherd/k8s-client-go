@@ -8,10 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/EmilyShepherd/k8s-client-go/pkg/token"
 )
 
 const (
@@ -23,8 +22,6 @@ const (
 type Interface interface {
 	// Do sends HTTP request to ObjectAPI server.
 	Do(req *http.Request) (*http.Response, error)
-	// Token returns current access token.
-	Token() string
 	// APIServerURL returns API server URL.
 	APIServerURL() string
 }
@@ -35,7 +32,7 @@ func NewInCluster() (*DefaultClient, error) {
 	if len(host) == 0 || len(port) == 0 {
 		return nil, fmt.Errorf("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
 	}
-	token, err := ioutil.ReadFile(serviceAccountToken)
+	token, err := token.NewFileToken(serviceAccountToken)
 	if err != nil {
 		return nil, err
 	}
@@ -51,47 +48,11 @@ func NewInCluster() (*DefaultClient, error) {
 	}}
 	httpClient := &http.Client{Transport: transport, Timeout: time.Nanosecond * 0}
 
-	client := &DefaultClient{
+	return &DefaultClient{
 		apiServerURL: "https://" + net.JoinHostPort(host, port),
-		token:        string(token),
+		token:        token,
 		HttpClient:   httpClient,
-	}
-
-	// Create a new file watcher to listen for new Service Account tokens
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, err
-	}
-
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					token, err := ioutil.ReadFile(serviceAccountToken)
-					if err == nil {
-						client.tokenMu.Lock()
-						client.token = string(token)
-						client.tokenMu.Unlock()
-					}
-				}
-			case _, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-			}
-		}
-	}()
-
-	err = watcher.Add(serviceAccountToken)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	}, nil
 }
 
 type DefaultClient struct {
@@ -99,22 +60,14 @@ type DefaultClient struct {
 	//Logger     Logger
 	apiServerURL string
 
-	tokenMu sync.RWMutex
-	token   string
+	token token.TokenProvider
 }
 
 func (kc *DefaultClient) Do(req *http.Request) (*http.Response, error) {
-	if token := kc.Token(); len(token) > 0 {
+	if token := kc.token.Token(); len(token) > 0 {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	return kc.HttpClient.Do(req)
-}
-
-func (kc *DefaultClient) Token() string {
-	kc.tokenMu.RLock()
-	defer kc.tokenMu.RUnlock()
-
-	return kc.token
 }
 
 func (kc *DefaultClient) APIServerURL() string {
