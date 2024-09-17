@@ -1,5 +1,9 @@
 package types
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // GetOptions is reserved to be implemented.
 type GetOptions struct {
 }
@@ -45,7 +49,8 @@ type Event[T interface{}] struct {
 }
 
 type List[T interface{}] struct {
-	Items []T `json:"items"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []T `json:"items"`
 }
 
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
@@ -78,7 +83,7 @@ type ObjectAPI[T interface{}] interface {
 	Apply(namespace, name, fieldManager string, force bool, item T) (*T, error)
 	Patch(namespace, name, fieldManager string, item T) (*T, error)
 	Create(namespace string, item T) (*T, error)
-	Delete(namespace, name string, force bool) error
+	Delete(namespace, name string, force bool) (*T, error)
 	Subresource(subresource string) ObjectAPI[T]
 	Status() ObjectAPI[T]
 }
