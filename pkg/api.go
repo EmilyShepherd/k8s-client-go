@@ -47,7 +47,7 @@ func WithResponseDecoder(decoderFunc ResponseDecoderFunc) ObjectAPIOption {
 	}
 }
 
-func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T] {
+func NewObjectAPI[T any, PT types.Object[T]](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T, PT] {
 	opts := objectAPIOptions{
 		log: &DefaultLogger{},
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
@@ -58,21 +58,103 @@ func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, o
 		o(&opts)
 	}
 
-	return &objectAPI[T]{
+	return &objectAPI[T, PT]{
 		kc:   kc,
 		opts: opts,
 		gvr:  gvr,
 	}
 }
 
-type objectAPI[T interface{}] struct {
+// The reason we need to use the truly ugly [T, PT interface{ *T }]
+// nonsense is that we want the API to be compatible with k8s' standard
+// library resources, which use pointer receivers for their `GetKind()`
+// style methods. Types with pointer receivers need to be explicitly
+// given as a pointer type for Golang generics, however we _also_ need
+// the base type so we can create new variables.
+//
+// For example, given the setup:
+//
+// ```golang
+//
+//	type Object struct {
+//	  GetKind()
+//	}
+//
+// type ObjectAPI[T Object] interface { ... }
+// ```
+//
+// If we were to try to create a new API for Pods:
+//
+// ```golang
+// NewObjectAPI[corev1.Pod](...)
+// ```
+//
+// This will fail because Pods pointer receivers for `GetKind()`. We
+// could fix this issue by requiring the caller to pass the pointer type
+// instead, so the format would be:
+//
+// ```golang
+// NewObjectAPI[*corev1.Pod](...)
+// ```
+//
+// However this now means that we don't have access to the base type
+// within the library so statements like this won't work:
+//
+// ```golang
+// var t T // T is a pointer to a type, not a type, so it'll be nil
+// ```
+//
+// Golang does not make it easy to convert between them without _very
+// explicitly_ defining an interface that requires itself to use pointer
+// receivers for itself:
+//
+// ```golang
+//
+//	type Object[T any] struct {
+//	  GetKind()
+//	  *T
+//	}
+//
+// ```
+//
+// We then have to do compiler shenanigans to get access to both the
+// base type and have the type checker verify that the pointer type has
+// the methods we need.
+//
+// ```golang
+// type ObjectAPI[T any, PT Object[T]]
+// ```
+//
+// Finally, this gives us access to the `T` which is the base type and
+// `PT` which is the pointer type which can be used to call methods:
+//
+// ```golang
+// var t T
+// PT(&t).GetKind()
+// ```
+//
+// Strangely, the go compiler even lets us use a syntactic shorthand and
+// still only specify:
+//
+// ```golang
+// NewObjectAPI[corev1.Pod]
+// ```
+//
+// Which it will translate under the hood to:
+//
+// ```golang
+// NewObjectAPI[corev1.Pod, Object[corev1.Pod]]
+// ```
+//
+// More info here: https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#pointer-method-example
+type objectAPI[T any, PT types.Object[T]] struct {
 	kc          Interface
 	opts        objectAPIOptions
 	gvr         types.GroupVersionResource
 	subresource string
 }
 
-func (o *objectAPI[T]) buildRequestURL(r ResourceRequest) string {
+func (o *objectAPI[T, PT]) buildRequestURL(r ResourceRequest) string {
 	var gvrPath string
 	if o.gvr.Group == "" {
 		gvrPath = path.Join("api", o.gvr.Version)
@@ -100,18 +182,18 @@ type ResourceRequest struct {
 	Body      io.Reader
 }
 
-func (o *objectAPI[T]) Subresource(subresource string) types.ObjectAPI[T] {
+func (o *objectAPI[T, PT]) Subresource(subresource string) types.ObjectAPI[T, PT] {
 	newO := *o
 	newO.subresource = subresource
 
 	return &newO
 }
 
-func (o *objectAPI[T]) Status() types.ObjectAPI[T] {
+func (o *objectAPI[T, PT]) Status() types.ObjectAPI[T, PT] {
 	return o.Subresource("status")
 }
 
-func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response, error) {
+func (o *objectAPI[T, PT]) do(r ResourceRequest, headers ...Header) (*http.Response, error) {
 	reqURL := o.buildRequestURL(r)
 	req, err := http.NewRequest(r.Verb, reqURL, r.Body)
 	if err != nil {
@@ -133,7 +215,7 @@ func (o *objectAPI[T]) do(r ResourceRequest, headers ...Header) (*http.Response,
 	return resp, nil
 }
 
-func (o *objectAPI[T]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) error {
+func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) error {
 	resp, err := o.do(req, headers...)
 	if err != nil {
 		return err
@@ -147,15 +229,15 @@ func (o *objectAPI[T]) doAndUnmarshal(item interface{}, req ResourceRequest, hea
 	return err
 }
 
-func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
+func (o *objectAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(&t, ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
 	})
 }
 
-func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.List[T], error) {
+func (o *objectAPI[T, PT]) List(namespace string, opts types.ListOptions) (*types.List[T, PT], error) {
 	extra := make([]string, len(opts.LabelSelector))
 	for _, label := range opts.LabelSelector {
 		if label.Operator == types.Exists {
@@ -165,24 +247,24 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 		}
 	}
 
-	var t types.List[T]
+	var t types.List[T, PT]
 	return &t, o.doAndUnmarshal(&t, ResourceRequest{
 		Namespace: namespace,
 		Extra:     extra,
 	})
 }
 
-func (o *objectAPI[T]) Create(namespace string, item T) (*T, error) {
+func (o *objectAPI[T, PT]) Create(namespace string, item T) (T, error) {
 	s, _ := json.Marshal(item)
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "POST",
 		Namespace: namespace,
 		Body:      bytes.NewReader(s),
 	})
 }
 
-func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (*T, error) {
+func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, error) {
 	s, _ := json.Marshal(item)
 
 	extra := []string{"fieldManager=" + fieldManager}
@@ -191,7 +273,7 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 	}
 
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
@@ -200,14 +282,14 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 	}, h)
 }
 
-func (o *objectAPI[T]) Delete(namespace, name string, force bool) (*T, error) {
+func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error) {
 	extra := []string{}
 	if force {
 		extra = append(extra, "force")
 	}
 
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "DELETE",
 		Namespace: namespace,
 		Name:      name,
@@ -215,15 +297,15 @@ func (o *objectAPI[T]) Delete(namespace, name string, force bool) (*T, error) {
 	})
 }
 
-func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
+func (o *objectAPI[T, PT]) Apply(namespace, name, fieldManager string, force bool, item T) (T, error) {
 	return o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
 }
 
-func (o *objectAPI[T]) Patch(namespace, name, fieldManager string, item T) (*T, error) {
+func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (T, error) {
 	return o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
 }
 
-func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T], error) {
+func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
 	resp, err := o.do(ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
@@ -232,5 +314,5 @@ func (o *objectAPI[T]) Watch(namespace, name string, opts types.ListOptions) (ty
 	if err != nil {
 		return nil, err
 	}
-	return newStreamWatcher[T](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
+	return newStreamWatcher[T, PT](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
 }

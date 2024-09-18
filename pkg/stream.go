@@ -15,8 +15,8 @@ type ResponseDecoder interface {
 
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a Watch.Interface.
-type streamWatcher[T interface{}] struct {
-	result  chan types.Event[T]
+type streamWatcher[T any, PT types.Object[T]] struct {
+	result  chan types.Event[T, PT]
 	r       io.ReadCloser
 	log     Logger
 	decoder ResponseDecoder
@@ -25,24 +25,24 @@ type streamWatcher[T interface{}] struct {
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given io.ReadClosers.
-func newStreamWatcher[T interface{}](r io.ReadCloser, log Logger, decoder ResponseDecoder) types.WatchInterface[T] {
-	sw := &streamWatcher[T]{
+func newStreamWatcher[T any, PT types.Object[T]](r io.ReadCloser, log Logger, decoder ResponseDecoder) types.WatchInterface[T, PT] {
+	sw := &streamWatcher[T, PT]{
 		r:       r,
 		log:     log,
 		decoder: decoder,
-		result:  make(chan types.Event[T]),
+		result:  make(chan types.Event[T, PT]),
 	}
 	go sw.receive()
 	return sw
 }
 
 // ResultChan implements Interface.
-func (sw *streamWatcher[T]) ResultChan() <-chan types.Event[T] {
+func (sw *streamWatcher[T, PT]) ResultChan() <-chan types.Event[T, PT] {
 	return sw.result
 }
 
 // Stop implements Interface.
-func (sw *streamWatcher[T]) Stop() {
+func (sw *streamWatcher[T, PT]) Stop() {
 	sw.Lock()
 	defer sw.Unlock()
 	if !sw.stopped {
@@ -52,14 +52,14 @@ func (sw *streamWatcher[T]) Stop() {
 }
 
 // stopping returns true if Stop() was called previously.
-func (sw *streamWatcher[T]) stopping() bool {
+func (sw *streamWatcher[T, PT]) stopping() bool {
 	sw.Lock()
 	defer sw.Unlock()
 	return sw.stopped
 }
 
 // receive reads result from the decoder in a loop and sends down the result channel.
-func (sw *streamWatcher[T]) receive() {
+func (sw *streamWatcher[T, PT]) receive() {
 	defer close(sw.result)
 	defer sw.Stop()
 	for {
@@ -85,8 +85,8 @@ func (sw *streamWatcher[T]) receive() {
 
 // Decode blocks until it can return the next object in the writer. Returns an error
 // if the writer is closed or an object can't be decoded.
-func (sw *streamWatcher[T]) Decode() (types.Event[T], error) {
-	var t types.Event[T]
+func (sw *streamWatcher[T, PT]) Decode() (types.Event[T, PT], error) {
+	var t types.Event[T, PT]
 	if err := sw.decoder.Decode(&t); err != nil {
 		return t, err
 	}

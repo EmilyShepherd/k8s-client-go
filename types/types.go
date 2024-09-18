@@ -8,6 +8,10 @@ import (
 type GetOptions struct {
 }
 
+type Object[T any] interface {
+	*T
+}
+
 const (
 	Equals      = "%3D"
 	Exists      = "Exists"
@@ -43,18 +47,18 @@ const (
 )
 
 // Event represents a single event to a watched resource.
-type Event[T interface{}] struct {
+type Event[T any, PT Object[T]] struct {
 	Type   EventType `json:"type"`
-	Object *T        `json:"object"`
+	Object T         `json:"object"`
 }
 
-type List[T interface{}] struct {
+type List[T any, PT Object[T]] struct {
 	metav1.ListMeta `json:"metadata"`
 	Items           []T `json:"items"`
 }
 
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
-type WatchInterface[T interface{}] interface {
+type WatchInterface[T any, PT Object[T]] interface {
 	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
 	// any resources used by the Watch.
 	Stop()
@@ -62,28 +66,18 @@ type WatchInterface[T interface{}] interface {
 	// ResultChan returns a chan which will receive all the events. If an error occurs
 	// or Stop() is called, this channel will be closed, in which case the
 	// Watch should be completely cleaned up.
-	ResultChan() <-chan Event[T]
-}
-
-// ObjectGetter is generic object getter.
-type ObjectGetter[T interface{}] interface {
-	Get(namespace, name string, _ GetOptions) (*T, error)
-}
-
-// ObjectWatcher is generic object watcher.
-type ObjectWatcher[T interface{}] interface {
-	Watch(namespace, name string, _ ListOptions) (WatchInterface[T], error)
+	ResultChan() <-chan Event[T, PT]
 }
 
 // ObjectAPI wraps all operations on object.
-type ObjectAPI[T interface{}] interface {
-	ObjectGetter[T]
-	ObjectWatcher[T]
-	List(namespace string, _ ListOptions) (*List[T], error)
-	Apply(namespace, name, fieldManager string, force bool, item T) (*T, error)
-	Patch(namespace, name, fieldManager string, item T) (*T, error)
-	Create(namespace string, item T) (*T, error)
-	Delete(namespace, name string, force bool) (*T, error)
-	Subresource(subresource string) ObjectAPI[T]
-	Status() ObjectAPI[T]
+type ObjectAPI[T any, PT Object[T]] interface {
+	Get(namespace, name string, _ GetOptions) (T, error)
+	Watch(namespace, name string, _ ListOptions) (WatchInterface[T, PT], error)
+	List(namespace string, _ ListOptions) (*List[T, PT], error)
+	Apply(namespace, name, fieldManager string, force bool, item T) (T, error)
+	Patch(namespace, name, fieldManager string, item T) (T, error)
+	Create(namespace string, item T) (T, error)
+	Delete(namespace, name string, force bool) (T, error)
+	Subresource(subresource string) ObjectAPI[T, PT]
+	Status() ObjectAPI[T, PT]
 }
