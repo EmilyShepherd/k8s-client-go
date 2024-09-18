@@ -1,4 +1,4 @@
-package client
+package apis
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/EmilyShepherd/k8s-client-go/pkg"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -47,7 +48,7 @@ func WithResponseDecoder(decoderFunc ResponseDecoderFunc) ObjectAPIOption {
 	}
 }
 
-func NewObjectAPI[T any, PT types.Object[T]](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T, PT] {
+func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T, PT] {
 	opts := objectAPIOptions{
 		log: &DefaultLogger{},
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
@@ -148,7 +149,7 @@ func NewObjectAPI[T any, PT types.Object[T]](kc Interface, gvr types.GroupVersio
 //
 // More info here: https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#pointer-method-example
 type objectAPI[T any, PT types.Object[T]] struct {
-	kc          Interface
+	kc          client.Interface
 	opts        objectAPIOptions
 	gvr         types.GroupVersionResource
 	subresource string
