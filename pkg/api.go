@@ -10,6 +10,8 @@ import (
 	"path"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -47,7 +49,7 @@ func WithResponseDecoder(decoderFunc ResponseDecoderFunc) ObjectAPIOption {
 	}
 }
 
-func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T] {
+func NewObjectAPI[T metav1.Object](kc Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T] {
 	opts := objectAPIOptions{
 		log: &DefaultLogger{},
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
@@ -65,7 +67,7 @@ func NewObjectAPI[T interface{}](kc Interface, gvr types.GroupVersionResource, o
 	}
 }
 
-type objectAPI[T interface{}] struct {
+type objectAPI[T metav1.Object] struct {
 	kc          Interface
 	opts        objectAPIOptions
 	gvr         types.GroupVersionResource
@@ -147,9 +149,9 @@ func (o *objectAPI[T]) doAndUnmarshal(item interface{}, req ResourceRequest, hea
 	return err
 }
 
-func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (*T, error) {
+func (o *objectAPI[T]) Get(namespace, name string, opts types.GetOptions) (T, error) {
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(t, ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -172,17 +174,17 @@ func (o *objectAPI[T]) List(namespace string, opts types.ListOptions) (*types.Li
 	})
 }
 
-func (o *objectAPI[T]) Create(namespace string, item T) (*T, error) {
+func (o *objectAPI[T]) Create(namespace string, item T) (T, error) {
 	s, _ := json.Marshal(item)
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(t, ResourceRequest{
 		Verb:      "POST",
 		Namespace: namespace,
 		Body:      bytes.NewReader(s),
 	})
 }
 
-func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (*T, error) {
+func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, error) {
 	s, _ := json.Marshal(item)
 
 	extra := []string{"fieldManager=" + fieldManager}
@@ -191,7 +193,7 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 	}
 
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(t, ResourceRequest{
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
@@ -200,14 +202,14 @@ func (o *objectAPI[T]) patch(namespace, name, fieldManager string, force bool, h
 	}, h)
 }
 
-func (o *objectAPI[T]) Delete(namespace, name string, force bool) (*T, error) {
+func (o *objectAPI[T]) Delete(namespace, name string, force bool) (T, error) {
 	extra := []string{}
 	if force {
 		extra = append(extra, "force")
 	}
 
 	var t T
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	return t, o.doAndUnmarshal(t, ResourceRequest{
 		Verb:      "DELETE",
 		Namespace: namespace,
 		Name:      name,
@@ -215,11 +217,11 @@ func (o *objectAPI[T]) Delete(namespace, name string, force bool) (*T, error) {
 	})
 }
 
-func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (*T, error) {
+func (o *objectAPI[T]) Apply(namespace, name, fieldManager string, force bool, item T) (T, error) {
 	return o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
 }
 
-func (o *objectAPI[T]) Patch(namespace, name, fieldManager string, item T) (*T, error) {
+func (o *objectAPI[T]) Patch(namespace, name, fieldManager string, item T) (T, error) {
 	return o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
 }
 

@@ -5,6 +5,8 @@ import (
 	"io"
 	"sync"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -15,7 +17,7 @@ type ResponseDecoder interface {
 
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a Watch.Interface.
-type streamWatcher[T interface{}] struct {
+type streamWatcher[T metav1.Object] struct {
 	result  chan types.Event[T]
 	r       io.ReadCloser
 	log     Logger
@@ -25,7 +27,7 @@ type streamWatcher[T interface{}] struct {
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given io.ReadClosers.
-func newStreamWatcher[T interface{}](r io.ReadCloser, log Logger, decoder ResponseDecoder) types.WatchInterface[T] {
+func newStreamWatcher[T metav1.Object](r io.ReadCloser, log Logger, decoder ResponseDecoder) types.WatchInterface[T] {
 	sw := &streamWatcher[T]{
 		r:       r,
 		log:     log,

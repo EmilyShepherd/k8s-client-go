@@ -43,18 +43,18 @@ const (
 )
 
 // Event represents a single event to a watched resource.
-type Event[T interface{}] struct {
+type Event[T metav1.Object] struct {
 	Type   EventType `json:"type"`
-	Object *T        `json:"object"`
+	Object T         `json:"object"`
 }
 
-type List[T interface{}] struct {
+type List[T metav1.Object] struct {
 	metav1.ListMeta `json:"metadata"`
 	Items           []T `json:"items"`
 }
 
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
-type WatchInterface[T interface{}] interface {
+type WatchInterface[T metav1.Object] interface {
 	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
 	// any resources used by the Watch.
 	Stop()
@@ -66,24 +66,24 @@ type WatchInterface[T interface{}] interface {
 }
 
 // ObjectGetter is generic object getter.
-type ObjectGetter[T interface{}] interface {
-	Get(namespace, name string, _ GetOptions) (*T, error)
+type ObjectGetter[T metav1.Object] interface {
+	Get(namespace, name string, _ GetOptions) (T, error)
 }
 
 // ObjectWatcher is generic object watcher.
-type ObjectWatcher[T interface{}] interface {
+type ObjectWatcher[T metav1.Object] interface {
 	Watch(namespace, name string, _ ListOptions) (WatchInterface[T], error)
 }
 
 // ObjectAPI wraps all operations on object.
-type ObjectAPI[T interface{}] interface {
+type ObjectAPI[T metav1.Object] interface {
 	ObjectGetter[T]
 	ObjectWatcher[T]
 	List(namespace string, _ ListOptions) (*List[T], error)
-	Apply(namespace, name, fieldManager string, force bool, item T) (*T, error)
-	Patch(namespace, name, fieldManager string, item T) (*T, error)
-	Create(namespace string, item T) (*T, error)
-	Delete(namespace, name string, force bool) (*T, error)
+	Apply(namespace, name, fieldManager string, force bool, item T) (T, error)
+	Patch(namespace, name, fieldManager string, item T) (T, error)
+	Create(namespace string, item T) (T, error)
+	Delete(namespace, name string, force bool) (T, error)
 	Subresource(subresource string) ObjectAPI[T]
 	Status() ObjectAPI[T]
 }
