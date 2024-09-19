@@ -76,7 +76,7 @@ type ObjectAPI[T any, PT Object[T]] interface {
 	Get(namespace, name string, _ GetOptions) (T, error)
 	Watch(namespace, name string, _ ListOptions) (WatchInterface[T, PT], error)
 	List(namespace string, _ ListOptions) (*List[T, PT], error)
-	Apply(namespace, name, fieldManager string, force bool, item T) (T, error)
+	Apply(namespace, name, fieldManager string, force bool, item T) (T, error, EventType)
 	Patch(namespace, name, fieldManager string, item T) (T, error)
 	Create(namespace string, item T) (T, error)
 	Delete(namespace, name string, force bool) (T, error)

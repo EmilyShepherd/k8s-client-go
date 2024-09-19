@@ -210,29 +210,33 @@ func (o *objectAPI[T, PT]) do(r ResourceRequest, headers ...Header) (*http.Respo
 	if resp.StatusCode < 200 || resp.StatusCode > 226 {
 		defer resp.Body.Close()
 		errmsg, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
+		return resp, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
 	}
 
 	return resp, nil
 }
 
-func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) error {
+func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) (*http.Response, error) {
 	resp, err := o.do(req, headers...)
 	if err != nil {
-		return err
+		return resp, err
 	}
 
 	defer resp.Body.Close()
 
-	if err := o.opts.responseDecodeFunc(resp.Body).Decode(item); err != nil {
-		return err
-	}
-	return err
+	err = o.opts.responseDecodeFunc(resp.Body).Decode(item)
+
+	return resp, err
+}
+
+func (o *objectAPI[T, PT]) doAndUnmarshalItem(req ResourceRequest) (T, error) {
+	var t T
+	_, err := o.doAndUnmarshal(&t, req)
+	return t, err
 }
 
 func (o *objectAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
-	var t T
-	return t, o.doAndUnmarshal(&t, ResourceRequest{
+	return o.doAndUnmarshalItem(ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -249,23 +253,23 @@ func (o *objectAPI[T, PT]) List(namespace string, opts types.ListOptions) (*type
 	}
 
 	var t types.List[T, PT]
-	return &t, o.doAndUnmarshal(&t, ResourceRequest{
+	_, err := o.doAndUnmarshal(&t, ResourceRequest{
 		Namespace: namespace,
 		Extra:     extra,
 	})
+	return &t, err
 }
 
 func (o *objectAPI[T, PT]) Create(namespace string, item T) (T, error) {
 	s, _ := json.Marshal(item)
-	var t T
-	return t, o.doAndUnmarshal(&t, ResourceRequest{
+	return o.doAndUnmarshalItem(ResourceRequest{
 		Verb:      "POST",
 		Namespace: namespace,
 		Body:      bytes.NewReader(s),
 	})
 }
 
-func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, error) {
+func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, *http.Response, error) {
 	s, _ := json.Marshal(item)
 
 	extra := []string{"fieldManager=" + fieldManager}
@@ -274,13 +278,16 @@ func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force boo
 	}
 
 	var t T
-	return t, o.doAndUnmarshal(&t, ResourceRequest{
+
+	err, resp := o.doAndUnmarshal(&t, ResourceRequest{
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
 		Extra:     extra,
 		Body:      bytes.NewReader(s),
 	}, h)
+
+	return t, err, resp
 }
 
 func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error) {
@@ -289,8 +296,7 @@ func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error)
 		extra = append(extra, "force")
 	}
 
-	var t T
-	return t, o.doAndUnmarshal(&t, ResourceRequest{
+	return o.doAndUnmarshalItem(ResourceRequest{
 		Verb:      "DELETE",
 		Namespace: namespace,
 		Name:      name,
@@ -298,12 +304,22 @@ func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error)
 	})
 }
 
-func (o *objectAPI[T, PT]) Apply(namespace, name, fieldManager string, force bool, item T) (T, error) {
-	return o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
+func (o *objectAPI[T, PT]) Apply(namespace, name, fieldManager string, force bool, item T) (T, error, types.EventType) {
+	t, resp, err := o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
+
+	var eventType types.EventType
+	if resp.StatusCode == 201 {
+		eventType = types.EventTypeAdded
+	} else {
+		eventType = types.EventTypeModified
+	}
+
+	return t, err, eventType
 }
 
 func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (T, error) {
-	return o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
+	t, _, err := o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
+	return t, err
 }
 
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
