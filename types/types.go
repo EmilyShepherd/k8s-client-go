@@ -10,6 +10,8 @@ type GetOptions struct {
 
 type Object[T any] interface {
 	*T
+	GetNamespace() string
+	GetLabels() map[string]string
 }
 
 const (
