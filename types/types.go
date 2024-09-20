@@ -10,7 +10,9 @@ type GetOptions struct {
 
 type Object[T any] interface {
 	*T
+	GetName() string
 	GetNamespace() string
+	GetResourceVersion() string
 	GetLabels() map[string]string
 }
 
