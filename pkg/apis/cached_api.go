@@ -3,6 +3,7 @@ package apis
 import (
 	"fmt"
 
+	"github.com/EmilyShepherd/k8s-client-go/pkg/util"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -44,7 +45,7 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 
 // Returns an item in the cached collection
 func (i *CachedAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
-	key := getKey(namespace, name)
+	key := util.GetKey(namespace, name)
 	item, found := i.cache.items[key]
 	if !found {
 		return item, fmt.Errorf("Could not find object %s", key)

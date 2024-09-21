@@ -3,6 +3,7 @@ package apis
 import (
 	"sync"
 
+	"github.com/EmilyShepherd/k8s-client-go/pkg/util"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -15,21 +16,6 @@ type ResourceCache[T any, PT types.Object[T]] struct {
 	watcherLock sync.RWMutex
 }
 
-func getKey(namespace, name string) string {
-	key := ""
-	if namespace != "" {
-		key = namespace + "/"
-	}
-
-	key += name
-
-	return key
-}
-
-func (i *ResourceCache[T, PT]) getKeyForObject(o PT) string {
-	return getKey(o.GetNamespace(), o.GetName())
-}
-
 func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace, name string, opts types.ListOptions) (*ResourceCache[T, PT], error) {
 	api := ResourceCache[T, PT]{
 		items:   make(map[string]T),
@@ -40,7 +26,7 @@ func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], 
 		if err != nil {
 			return nil, err
 		}
-		api.items[api.getKeyForObject(&item)] = item
+		api.items[util.GetKeyForObject[T, PT](&item)] = item
 		opts.ResourceVersion = PT(&item).GetResourceVersion()
 	} else {
 		list, err := rawApi.List(namespace, opts)
@@ -49,7 +35,7 @@ func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], 
 		}
 
 		for _, item := range list.Items {
-			api.items[api.getKeyForObject(&item)] = item
+			api.items[util.GetKeyForObject[T, PT](&item)] = item
 		}
 		opts.ResourceVersion = list.ResourceVersion
 	}
@@ -86,7 +72,7 @@ func (i *ResourceCache[T, PT]) all() map[string]T {
 }
 
 func (i *ResourceCache[T, PT]) processEvent(e types.Event[T, PT]) {
-	key := i.getKeyForObject(&e.Object)
+	key := util.GetKeyForObject[T, PT](&e.Object)
 
 	i.itemLock.Lock()
 	if e.Type == types.EventTypeDeleted {
