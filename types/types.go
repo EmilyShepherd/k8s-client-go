@@ -30,7 +30,8 @@ type LabelSelector struct {
 
 // ListOptions is reserved to be implemented.
 type ListOptions struct {
-	LabelSelector []LabelSelector
+	LabelSelector   []LabelSelector
+	ResourceVersion string
 }
 
 type GroupVersionResource struct {

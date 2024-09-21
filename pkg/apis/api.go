@@ -323,10 +323,14 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 }
 
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
+	extra := []string{"watch"}
+	if opts.ResourceVersion != "" {
+		extra = append(extra, "resourceVersion="+opts.ResourceVersion)
+	}
 	resp, err := o.do(ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
-		Extra:     []string{"watch"},
+		Extra:     extra,
 	})
 	if err != nil {
 		return nil, err
