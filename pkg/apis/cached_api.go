@@ -31,12 +31,14 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 		selectors: opts.LabelSelector,
 	}
 
-	for _, item := range i.cache.items {
-		p.input <- types.Event[T, PT]{
-			Type:   types.EventTypeAdded,
-			Object: item,
+	go func() {
+		for _, item := range i.cache.all() {
+			p.input <- types.Event[T, PT]{
+				Type:   types.EventTypeAdded,
+				Object: item,
+			}
 		}
-	}
+	}()
 
 	go p.run()
 
