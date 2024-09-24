@@ -327,6 +327,13 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 	if opts.ResourceVersion != "" {
 		extra = append(extra, "resourceVersion="+opts.ResourceVersion)
 	}
+	for _, label := range opts.LabelSelector {
+		if label.Operator == types.Exists {
+			extra = append(extra, "labelSelector="+label.Label)
+		} else {
+			extra = append(extra, "labelSelector="+label.Label+label.Operator+label.Value)
+		}
+	}
 	resp, err := o.do(ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
