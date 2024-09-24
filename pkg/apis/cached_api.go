@@ -33,9 +33,11 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 
 	go func() {
 		for _, item := range i.cache.all() {
-			p.input <- types.Event[T, PT]{
-				Type:   types.EventTypeAdded,
-				Object: item,
+			if Matches(namespace, opts.LabelSelector, PT(&item)) {
+				p.input <- types.Event[T, PT]{
+					Type:   types.EventTypeAdded,
+					Object: item,
+				}
 			}
 		}
 	}()
