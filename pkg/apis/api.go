@@ -327,9 +327,14 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 	if opts.ResourceVersion != "" {
 		extra = append(extra, "resourceVersion="+opts.ResourceVersion)
 	}
+	// Watching in kubernetes is a collection-level operation so it's not
+	// possible to watch a single resource via its URL. However we can do
+	// it via a fieldSelector on the resource name.
+	if name != "" {
+		extra = append(extra, "fieldSelector=metadata.name"+types.Equals+name)
+	}
 	resp, err := o.do(ResourceRequest{
 		Namespace: namespace,
-		Name:      name,
 		Extra:     extra,
 	})
 	if err != nil {
