@@ -1,8 +1,6 @@
 module github.com/EmilyShepherd/k8s-client-go
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.23.0
 
 require (
 	github.com/fsnotify/fsnotify v1.5.4
