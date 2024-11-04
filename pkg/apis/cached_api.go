@@ -43,6 +43,7 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 	}()
 
 	go p.run()
+	i.cache.watchers = append(i.cache.watchers, p)
 
 	return &p, nil
 }
