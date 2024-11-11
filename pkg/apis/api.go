@@ -7,8 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path"
-	"strings"
 
 	"github.com/EmilyShepherd/k8s-client-go/pkg"
 	"github.com/EmilyShepherd/k8s-client-go/types"
@@ -66,8 +66,8 @@ func (o *objectAPI[T, PT]) buildRequestURL(r ResourceRequest) string {
 	}
 	url := o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, r.Name, o.subresource)
 
-	if len(r.Extra) > 0 {
-		url += "?" + strings.Join(r.Extra, "&")
+	if queryString := r.Values.Encode(); queryString != "" {
+		url += "?" + queryString
 	}
 
 	return url
@@ -77,7 +77,7 @@ type ResourceRequest struct {
 	Verb      string
 	Namespace string
 	Name      string
-	Extra     []string
+	Values    url.Values
 	Body      io.Reader
 }
 
@@ -141,19 +141,19 @@ func (o *objectAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T
 }
 
 func (o *objectAPI[T, PT]) List(namespace string, opts types.ListOptions) (*types.List[T, PT], error) {
-	extra := make([]string, len(opts.LabelSelector))
+	q := url.Values{}
 	for _, label := range opts.LabelSelector {
 		if label.Operator == types.Exists {
-			extra = append(extra, "labelSelector="+label.Label)
+			q.Add("labelSelector=", label.Label)
 		} else {
-			extra = append(extra, "labelSelector="+label.Label+label.Operator+label.Value)
+			q.Add("labelSelector=", label.Label+label.Operator+label.Value)
 		}
 	}
 
 	var t types.List[T, PT]
 	_, err := o.doAndUnmarshal(&t, ResourceRequest{
 		Namespace: namespace,
-		Extra:     extra,
+		Values:    q,
 	})
 	return &t, err
 }
@@ -170,9 +170,10 @@ func (o *objectAPI[T, PT]) Create(namespace string, item T) (T, error) {
 func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, *http.Response, error) {
 	s, _ := json.Marshal(item)
 
-	extra := []string{"fieldManager=" + fieldManager}
+	q := url.Values{}
+	q.Set("fieldManager", fieldManager)
 	if force {
-		extra = append(extra, "force")
+		q.Set("force", "1")
 	}
 
 	var t T
@@ -181,7 +182,7 @@ func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force boo
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
-		Extra:     extra,
+		Values:    q,
 		Body:      bytes.NewReader(s),
 	}, h)
 
@@ -189,16 +190,16 @@ func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force boo
 }
 
 func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error) {
-	extra := []string{}
+	q := url.Values{}
 	if force {
-		extra = append(extra, "force")
+		q.Set("force", "1")
 	}
 
 	return o.doAndUnmarshalItem(ResourceRequest{
 		Verb:      "DELETE",
 		Namespace: namespace,
 		Name:      name,
-		Extra:     extra,
+		Values:    q,
 	})
 }
 
@@ -221,21 +222,22 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 }
 
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
-	extra := []string{"watch"}
+	q := url.Values{}
+	q.Set("watch", "1")
 	if opts.ResourceVersion != "" {
-		extra = append(extra, "resourceVersion="+opts.ResourceVersion)
+		q.Set("resourceVersion", opts.ResourceVersion)
 	}
 	for _, label := range opts.LabelSelector {
 		if label.Operator == types.Exists {
-			extra = append(extra, "labelSelector="+label.Label)
+			q.Add("labelSelector", label.Label)
 		} else {
-			extra = append(extra, "labelSelector="+label.Label+label.Operator+label.Value)
+			q.Add("labelSelector", label.Label+label.Operator+label.Value)
 		}
 	}
 	resp, err := o.do(ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
-		Extra:     extra,
+		Values:    q,
 	})
 	if err != nil {
 		return nil, err
