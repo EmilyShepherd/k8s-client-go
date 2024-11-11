@@ -32,37 +32,16 @@ type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
 type ObjectAPIOption func(opts *objectAPIOptions)
 type objectAPIOptions struct {
-	log                Logger
-	responseDecodeFunc ResponseDecoderFunc
 }
 
-func WithLogger(log Logger) ObjectAPIOption {
-	return func(opts *objectAPIOptions) {
-		opts.log = log
-	}
-}
-
-func WithResponseDecoder(decoderFunc ResponseDecoderFunc) ObjectAPIOption {
-	return func(opts *objectAPIOptions) {
-		opts.responseDecodeFunc = decoderFunc
-	}
-}
-
-func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.GroupVersionResource, opt ...ObjectAPIOption) types.ObjectAPI[T, PT] {
-	opts := objectAPIOptions{
+func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.GroupVersionResource) types.ObjectAPI[T, PT] {
+	return &objectAPI[T, PT]{
+		kc:  kc,
 		log: &DefaultLogger{},
+		gvr: gvr,
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
 			return json.NewDecoder(r)
 		},
-	}
-	for _, o := range opt {
-		o(&opts)
-	}
-
-	return &objectAPI[T, PT]{
-		kc:   kc,
-		opts: opts,
-		gvr:  gvr,
 	}
 }
 
@@ -149,10 +128,11 @@ func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.Grou
 //
 // More info here: https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#pointer-method-example
 type objectAPI[T any, PT types.Object[T]] struct {
-	kc          client.Interface
-	opts        objectAPIOptions
-	gvr         types.GroupVersionResource
-	subresource string
+	kc                 client.Interface
+	log                Logger
+	responseDecodeFunc ResponseDecoderFunc
+	gvr                types.GroupVersionResource
+	subresource        string
 }
 
 func (o *objectAPI[T, PT]) buildRequestURL(r ResourceRequest) string {
@@ -224,7 +204,7 @@ func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest,
 
 	defer resp.Body.Close()
 
-	err = o.opts.responseDecodeFunc(resp.Body).Decode(item)
+	err = o.responseDecodeFunc(resp.Body).Decode(item)
 
 	return resp, err
 }
@@ -342,5 +322,5 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 	if err != nil {
 		return nil, err
 	}
-	return newStreamWatcher[T, PT](resp.Body, o.opts.log, o.opts.responseDecodeFunc(resp.Body)), nil
+	return newStreamWatcher[T, PT](resp.Body, o.log, o.responseDecodeFunc(resp.Body)), nil
 }
