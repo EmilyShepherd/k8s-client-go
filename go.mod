@@ -1,18 +1,16 @@
 module github.com/EmilyShepherd/k8s-client-go
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.23.0
 
 require (
 	github.com/fsnotify/fsnotify v1.5.4
+	github.com/gammazero/deque v0.2.1
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 )
 
 require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
