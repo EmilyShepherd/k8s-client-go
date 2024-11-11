@@ -17,11 +17,11 @@ type Object[T any] interface {
 }
 
 const (
-	Equals      = "%3D"
+	Equals      = "=="
 	Exists      = "Exists"
 	LessThan    = "lt"
 	GreaterThan = "gt"
-	NotEquals   = "%21%3D"
+	NotEquals   = "!="
 )
 
 type LabelSelector struct {
