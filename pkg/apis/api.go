@@ -225,7 +225,6 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
 	req := ResourceRequest{
 		Namespace: namespace,
-		Name:      name,
 		Values:    make(url.Values, len(opts.LabelSelector)+1),
 	}
 	req.Values.Set("watch", "1")
@@ -236,6 +235,14 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 			req.Values.Add("labelSelector", label.Label+label.Operator+label.Value)
 		}
 	}
+
+	// Watching in kubernetes is a collection-level operation so it's not
+	// possible to watch a single resource via its URL. However we can do
+	// it via a fieldSelector on the resource name.
+	if name != "" {
+		req.Values.Add("fieldSelector", "metadata.name"+types.Equals+name)
+	}
+
 	watch := &Watcher[T, PT]{
 		req:             req,
 		api:             o,
