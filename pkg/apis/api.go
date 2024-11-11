@@ -11,6 +11,7 @@ import (
 	"path"
 
 	"github.com/EmilyShepherd/k8s-client-go/pkg"
+	"github.com/EmilyShepherd/k8s-client-go/pkg/stream"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -222,25 +223,27 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 }
 
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
-	q := url.Values{}
-	q.Set("watch", "1")
-	if opts.ResourceVersion != "" {
-		q.Set("resourceVersion", opts.ResourceVersion)
-	}
-	for _, label := range opts.LabelSelector {
-		if label.Operator == types.Exists {
-			q.Add("labelSelector", label.Label)
-		} else {
-			q.Add("labelSelector", label.Label+label.Operator+label.Value)
-		}
-	}
-	resp, err := o.do(ResourceRequest{
+	req := ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
-		Values:    q,
-	})
-	if err != nil {
+		Values:    make(url.Values, len(opts.LabelSelector)+1),
+	}
+	req.Values.Set("watch", "1")
+	for _, label := range opts.LabelSelector {
+		if label.Operator == types.Exists {
+			req.Values.Add("labelSelector", label.Label)
+		} else {
+			req.Values.Add("labelSelector", label.Label+label.Operator+label.Value)
+		}
+	}
+	watch := &Watcher[T, PT]{
+		req:             req,
+		api:             o,
+		resourceVersion: opts.ResourceVersion,
+	}
+	if err := watch.doWatch(); err != nil {
 		return nil, err
 	}
-	return newStreamWatcher[T, PT](resp.Body, o.log, o.responseDecodeFunc(resp.Body)), nil
+
+	return stream.NewAsyncStream[types.Event[T, PT]](watch), nil
 }
