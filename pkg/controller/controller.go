@@ -11,11 +11,12 @@ import (
 )
 
 type Controller[T any, PT types.Object[T]] struct {
-	waiting map[string]bool
-	queue   *deque.Deque[string]
-	lock    sync.RWMutex
-	cond    *sync.Cond
-	api     types.ObjectAPI[T, PT]
+	waiting    map[string]bool
+	inProgress map[string]bool
+	queue      *deque.Deque[string]
+	lock       sync.RWMutex
+	cond       *sync.Cond
+	api        types.ObjectAPI[T, PT]
 }
 
 func NewEmptyController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) *Controller[T, PT] {
@@ -69,6 +70,18 @@ func (c *Controller[T, PT]) Run(action RunAction[T]) {
 		}
 
 		key := c.queue.PopFront()
+
+		// If the key has been readded since a controller started working on
+		// it, it needs processing but we need to wait for the last run to
+		// complete first, so we'll just put it to the back of the line and
+		// try again later.
+		if _, exists := c.inProgress[key]; exists {
+			c.queue.PushBack(key)
+			continue
+		} else {
+			c.inProgress[key] = true
+		}
+
 		delete(c.waiting, key)
 		c.lock.Unlock()
 
@@ -79,5 +92,9 @@ func (c *Controller[T, PT]) Run(action RunAction[T]) {
 		}
 
 		action(element)
+
+		c.lock.Lock()
+		delete(c.inProgress, key)
+		c.lock.Unlock()
 	}
 }
