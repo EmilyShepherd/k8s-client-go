@@ -2,30 +2,23 @@ package controller
 
 import (
 	"fmt"
-	"sync"
 
-	"github.com/gammazero/deque"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/EmilyShepherd/k8s-client-go/pkg/util"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
 type Controller[T any, PT types.Object[T]] struct {
-	waiting map[string]bool
-	queue   *deque.Deque[string]
-	lock    sync.RWMutex
-	cond    *sync.Cond
-	api     types.ObjectAPI[T, PT]
+	api   types.ObjectAPI[T, PT]
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 func NewEmptyController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) *Controller[T, PT] {
-	c := Controller[T, PT]{
-		waiting: make(map[string]bool),
-		queue:   deque.New[string](),
-		api:     root,
+	return &Controller[T, PT]{
+		api:   root,
+		queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 	}
-	c.cond = sync.NewCond(&c.lock)
-	return &c
 }
 
 func NewController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) (*Controller[T, PT], error) {
@@ -42,17 +35,7 @@ func NewController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) (*Con
 func (c *Controller[T, PT]) Watches(r chan string) *Controller[T, PT] {
 	go func() {
 		for key := range r {
-			c.lock.Lock()
-			_, exists := c.waiting[key]
-			if exists {
-				c.lock.Unlock()
-				continue
-			}
-
-			c.queue.PushBack(key)
-			c.waiting[key] = true
-			c.lock.Unlock()
-			c.cond.Signal()
+			c.queue.Add(key)
 		}
 	}()
 
@@ -63,14 +46,10 @@ type RunAction[T any] func(T) error
 
 func (c *Controller[T, PT]) Run(action RunAction[T]) {
 	for {
-		c.lock.Lock()
-		for c.queue.Len() == 0 {
-			c.cond.Wait()
+		key, quit := c.queue.Get()
+		if quit {
+			return
 		}
-
-		key := c.queue.PopFront()
-		delete(c.waiting, key)
-		c.lock.Unlock()
 
 		ns, name := util.GetObjectForKey(key)
 		element, err := c.api.Get(ns, name, types.GetOptions{})
@@ -79,5 +58,7 @@ func (c *Controller[T, PT]) Run(action RunAction[T]) {
 		}
 
 		action(element)
+
+		c.queue.Done(key)
 	}
 }
