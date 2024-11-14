@@ -8,18 +8,15 @@ import (
 )
 
 type ResourceCache[T any, PT types.Object[T]] struct {
-	watcher     types.WatchInterface[T, PT]
-	items       map[string]T
-	settled     chan interface{}
-	watchers    []pipeWatcher[T, PT]
-	itemLock    sync.RWMutex
-	watcherLock sync.RWMutex
+	watcher  types.WatchInterface[T, PT]
+	items    map[string]T
+	watchers []pipeWatcher[T, PT]
+	itemLock sync.RWMutex
 }
 
 func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace, name string, opts types.ListOptions) (*ResourceCache[T, PT], error) {
 	api := ResourceCache[T, PT]{
-		items:   make(map[string]T),
-		settled: make(chan interface{}),
+		items: make(map[string]T),
 	}
 	if name != "" {
 		item, err := rawApi.Get(namespace, name, types.GetOptions{})
