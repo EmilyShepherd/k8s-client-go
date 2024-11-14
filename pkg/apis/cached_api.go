@@ -14,8 +14,8 @@ type CachedAPI[T any, PT types.Object[T]] struct {
 	cache *ResourceCache[T, PT]
 }
 
-func NewCachedAPI[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace, name string, opts types.ListOptions) (*CachedAPI[T, PT], error) {
-	cache, err := NewResourceCache(rawApi, namespace, name, opts)
+func NewCachedAPI[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace string, opts types.ListOptions) (*CachedAPI[T, PT], error) {
+	cache, err := NewResourceCache(rawApi, namespace, opts)
 	return &CachedAPI[T, PT]{
 		api:   rawApi,
 		cache: cache,

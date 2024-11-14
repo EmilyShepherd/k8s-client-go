@@ -14,30 +14,22 @@ type ResourceCache[T any, PT types.Object[T]] struct {
 	itemLock sync.RWMutex
 }
 
-func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace, name string, opts types.ListOptions) (*ResourceCache[T, PT], error) {
+func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace string, opts types.ListOptions) (*ResourceCache[T, PT], error) {
 	api := ResourceCache[T, PT]{
 		items: make(map[string]T),
 	}
-	if name != "" {
-		item, err := rawApi.Get(namespace, name, types.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-		api.items[util.GetKeyForObject[T, PT](&item)] = item
-		opts.ResourceVersion = PT(&item).GetResourceVersion()
-	} else {
-		list, err := rawApi.List(namespace, opts)
-		if err != nil {
-			return nil, err
-		}
 
-		for _, item := range list.Items {
-			api.items[util.GetKeyForObject[T, PT](&item)] = item
-		}
-		opts.ResourceVersion = list.ResourceVersion
+	list, err := rawApi.List(namespace, opts)
+	if err != nil {
+		return nil, err
 	}
 
-	watcher, err := rawApi.Watch(namespace, name, opts)
+	for _, item := range list.Items {
+		api.items[util.GetKeyForObject[T, PT](&item)] = item
+	}
+	opts.ResourceVersion = list.ResourceVersion
+
+	watcher, err := rawApi.Watch(namespace, "", opts)
 	if err != nil {
 		return nil, err
 	}
