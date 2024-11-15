@@ -1,8 +1,10 @@
 package apis
 
 import (
+	"encoding/json"
 	"io"
 
+	"github.com/EmilyShepherd/k8s-client-go/pkg/client"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
@@ -20,8 +22,8 @@ type ResponseDecoder interface {
 type Watcher[T any, PT types.Object[T]] struct {
 	closer          io.Closer
 	decoder         ResponseDecoder
-	api             *objectAPI[T, PT]
-	req             ResourceRequest
+	api             *client.Client
+	req             client.ResourceRequest
 	resourceVersion string
 }
 
@@ -37,13 +39,13 @@ func (sw *Watcher[T, PT]) doWatch() error {
 		sw.req.Values.Set("resourceVersion", sw.resourceVersion)
 	}
 
-	resp, err := sw.api.do(sw.req)
+	resp, err := sw.api.Do(sw.req)
 	if err != nil {
 		return err
 	}
 
 	sw.closer = resp.Body
-	sw.decoder = sw.api.responseDecodeFunc(resp.Body)
+	sw.decoder = json.NewDecoder(resp.Body)
 
 	return nil
 }

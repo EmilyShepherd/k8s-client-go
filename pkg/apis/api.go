@@ -3,12 +3,9 @@ package apis
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-	"path"
 
 	"github.com/EmilyShepherd/k8s-client-go/pkg/client"
 	"github.com/EmilyShepherd/k8s-client-go/pkg/stream"
@@ -31,7 +28,7 @@ var MergePatchHeader = Header{
 
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
-func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.GroupVersionResource) types.ObjectAPI[T, PT] {
+func NewObjectAPI[T any, PT types.Object[T]](kc *client.Client, gvr types.GroupVersionResource) types.ObjectAPI[T, PT] {
 	return &objectAPI[T, PT]{
 		kc:  kc,
 		gvr: gvr,
@@ -42,38 +39,10 @@ func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.Grou
 }
 
 type objectAPI[T any, PT types.Object[T]] struct {
-	kc                 client.Interface
+	kc                 *client.Client
 	responseDecodeFunc ResponseDecoderFunc
 	gvr                types.GroupVersionResource
 	subresource        string
-}
-
-func (o *objectAPI[T, PT]) buildRequestURL(r ResourceRequest) string {
-	var gvrPath string
-	if o.gvr.Group == "" {
-		gvrPath = path.Join("api", o.gvr.Version)
-	} else {
-		gvrPath = path.Join("apis", o.gvr.Group, o.gvr.Version)
-	}
-	var nsPath string
-	if r.Namespace != "" {
-		nsPath = path.Join("namespaces", r.Namespace)
-	}
-	url := o.kc.APIServerURL() + "/" + path.Join(gvrPath, nsPath, o.gvr.Resource, r.Name, o.subresource)
-
-	if queryString := r.Values.Encode(); queryString != "" {
-		url += "?" + queryString
-	}
-
-	return url
-}
-
-type ResourceRequest struct {
-	Verb      string
-	Namespace string
-	Name      string
-	Values    url.Values
-	Body      io.Reader
 }
 
 func (o *objectAPI[T, PT]) Subresource(subresource string) types.ObjectAPI[T, PT] {
@@ -87,30 +56,10 @@ func (o *objectAPI[T, PT]) Status() types.ObjectAPI[T, PT] {
 	return o.Subresource("status")
 }
 
-func (o *objectAPI[T, PT]) do(r ResourceRequest, headers ...Header) (*http.Response, error) {
-	reqURL := o.buildRequestURL(r)
-	req, err := http.NewRequest(r.Verb, reqURL, r.Body)
-	if err != nil {
-		return nil, err
-	}
-	for _, header := range headers {
-		req.Header.Set(header.Name, header.Value)
-	}
+func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req client.ResourceRequest, headers ...Header) (*http.Response, error) {
+	req.GVR = o.gvr
+	req.Subresource = o.subresource
 	resp, err := o.kc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode > 226 {
-		defer resp.Body.Close()
-		errmsg, _ := ioutil.ReadAll(resp.Body)
-		return resp, fmt.Errorf("invalid response code %d for request url %q: %s", resp.StatusCode, reqURL, errmsg)
-	}
-
-	return resp, nil
-}
-
-func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest, headers ...Header) (*http.Response, error) {
-	resp, err := o.do(req, headers...)
 	if err != nil {
 		return resp, err
 	}
@@ -122,14 +71,14 @@ func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req ResourceRequest,
 	return resp, err
 }
 
-func (o *objectAPI[T, PT]) doAndUnmarshalItem(req ResourceRequest) (T, error) {
+func (o *objectAPI[T, PT]) doAndUnmarshalItem(req client.ResourceRequest) (T, error) {
 	var t T
 	_, err := o.doAndUnmarshal(&t, req)
 	return t, err
 }
 
 func (o *objectAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
-	return o.doAndUnmarshalItem(ResourceRequest{
+	return o.doAndUnmarshalItem(client.ResourceRequest{
 		Namespace: namespace,
 		Name:      name,
 	})
@@ -146,7 +95,7 @@ func (o *objectAPI[T, PT]) List(namespace string, opts types.ListOptions) (*type
 	}
 
 	var t types.List[T, PT]
-	_, err := o.doAndUnmarshal(&t, ResourceRequest{
+	_, err := o.doAndUnmarshal(&t, client.ResourceRequest{
 		Namespace: namespace,
 		Values:    q,
 	})
@@ -155,7 +104,7 @@ func (o *objectAPI[T, PT]) List(namespace string, opts types.ListOptions) (*type
 
 func (o *objectAPI[T, PT]) Create(namespace string, item T) (T, error) {
 	s, _ := json.Marshal(item)
-	return o.doAndUnmarshalItem(ResourceRequest{
+	return o.doAndUnmarshalItem(client.ResourceRequest{
 		Verb:      "POST",
 		Namespace: namespace,
 		Body:      bytes.NewReader(s),
@@ -173,7 +122,7 @@ func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force boo
 
 	var t T
 
-	err, resp := o.doAndUnmarshal(&t, ResourceRequest{
+	err, resp := o.doAndUnmarshal(&t, client.ResourceRequest{
 		Verb:      "PATCH",
 		Namespace: namespace,
 		Name:      name,
@@ -190,7 +139,7 @@ func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error)
 		q.Set("force", "1")
 	}
 
-	return o.doAndUnmarshalItem(ResourceRequest{
+	return o.doAndUnmarshalItem(client.ResourceRequest{
 		Verb:      "DELETE",
 		Namespace: namespace,
 		Name:      name,
@@ -217,9 +166,10 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 }
 
 func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
-	req := ResourceRequest{
+	req := client.ResourceRequest{
 		Namespace: namespace,
 		Values:    make(url.Values, len(opts.LabelSelector)+1),
+		GVR:       o.gvr,
 	}
 	req.Values.Set("watch", "1")
 	for _, label := range opts.LabelSelector {
@@ -239,7 +189,7 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 
 	watch := &Watcher[T, PT]{
 		req:             req,
-		api:             o,
+		api:             o.kc,
 		resourceVersion: opts.ResourceVersion,
 	}
 	if err := watch.doWatch(); err != nil {
