@@ -31,14 +31,9 @@ var MergePatchHeader = Header{
 
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
-type ObjectAPIOption func(opts *objectAPIOptions)
-type objectAPIOptions struct {
-}
-
 func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.GroupVersionResource) types.ObjectAPI[T, PT] {
 	return &objectAPI[T, PT]{
 		kc:  kc,
-		log: &DefaultLogger{},
 		gvr: gvr,
 		responseDecodeFunc: func(r io.Reader) ResponseDecoder {
 			return json.NewDecoder(r)
@@ -48,7 +43,6 @@ func NewObjectAPI[T any, PT types.Object[T]](kc client.Interface, gvr types.Grou
 
 type objectAPI[T any, PT types.Object[T]] struct {
 	kc                 client.Interface
-	log                Logger
 	responseDecodeFunc ResponseDecoderFunc
 	gvr                types.GroupVersionResource
 	subresource        string
