@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/EmilyShepherd/k8s-client-go/pkg"
+	"github.com/EmilyShepherd/k8s-client-go/pkg/client"
 	"github.com/EmilyShepherd/k8s-client-go/pkg/stream"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
