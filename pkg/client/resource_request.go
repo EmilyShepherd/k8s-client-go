@@ -8,12 +8,21 @@ import (
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
+type ContentType string
+
+const (
+	ApplyPatchContentType ContentType = "application/apply-patch+yaml"
+	MergePatchContentType             = "application/merge-patch+json"
+	JSONContentType                   = "application/json"
+)
+
 type ResourceRequest struct {
 	GVR         types.GroupVersionResource
 	Subresource string
 	Verb        string
 	Namespace   string
 	Name        string
+	ContentType ContentType
 	Values      url.Values
 	Body        io.Reader
 }

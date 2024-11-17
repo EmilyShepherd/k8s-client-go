@@ -76,6 +76,10 @@ func (kc *Client) Do(r ResourceRequest) (*http.Response, error) {
 
 	req.Header.Set("Accept", "application/json,application/vnd.kubernetes.protobuf")
 
+	if r.ContentType != "" {
+		req.Header.Set("Content-Type", string(r.ContentType))
+	}
+
 	resp, err := kc.DoRaw(req)
 	if err != nil {
 		return nil, err

@@ -12,20 +12,6 @@ import (
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
-type Header struct {
-	Name  string
-	Value string
-}
-
-var ApplyPatchHeader = Header{
-	Name:  "content-type",
-	Value: "application/apply-patch+yaml",
-}
-var MergePatchHeader = Header{
-	Name:  "content-type",
-	Value: "application/merge-patch+json",
-}
-
 type ResponseDecoderFunc func(r io.Reader) ResponseDecoder
 
 func NewObjectAPI[T any, PT types.Object[T]](kc *client.Client, gvr types.GroupVersionResource) types.ObjectAPI[T, PT] {
@@ -56,7 +42,7 @@ func (o *objectAPI[T, PT]) Status() types.ObjectAPI[T, PT] {
 	return o.Subresource("status")
 }
 
-func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req client.ResourceRequest, headers ...Header) (*http.Response, error) {
+func (o *objectAPI[T, PT]) doAndUnmarshal(item interface{}, req client.ResourceRequest) (*http.Response, error) {
 	req.GVR = o.gvr
 	req.Subresource = o.subresource
 	resp, err := o.kc.Do(req)
@@ -111,7 +97,7 @@ func (o *objectAPI[T, PT]) Create(namespace string, item T) (T, error) {
 	})
 }
 
-func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, h Header, item T) (T, *http.Response, error) {
+func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force bool, ct client.ContentType, item T) (T, *http.Response, error) {
 	s, _ := json.Marshal(item)
 
 	q := url.Values{}
@@ -123,12 +109,13 @@ func (o *objectAPI[T, PT]) patch(namespace, name, fieldManager string, force boo
 	var t T
 
 	err, resp := o.doAndUnmarshal(&t, client.ResourceRequest{
-		Verb:      "PATCH",
-		Namespace: namespace,
-		Name:      name,
-		Values:    q,
-		Body:      bytes.NewReader(s),
-	}, h)
+		Verb:        "PATCH",
+		Namespace:   namespace,
+		Name:        name,
+		Values:      q,
+		Body:        bytes.NewReader(s),
+		ContentType: ct,
+	})
 
 	return t, err, resp
 }
@@ -148,7 +135,7 @@ func (o *objectAPI[T, PT]) Delete(namespace, name string, force bool) (T, error)
 }
 
 func (o *objectAPI[T, PT]) Apply(namespace, name, fieldManager string, force bool, item T) (T, error, types.EventType) {
-	t, resp, err := o.patch(namespace, name, fieldManager, force, ApplyPatchHeader, item)
+	t, resp, err := o.patch(namespace, name, fieldManager, force, client.ApplyPatchContentType, item)
 
 	var eventType types.EventType
 	if resp.StatusCode == 201 {
@@ -161,7 +148,7 @@ func (o *objectAPI[T, PT]) Apply(namespace, name, fieldManager string, force boo
 }
 
 func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (T, error) {
-	t, _, err := o.patch(namespace, name, fieldManager, false, MergePatchHeader, item)
+	t, _, err := o.patch(namespace, name, fieldManager, false, client.MergePatchContentType, item)
 	return t, err
 }
 
