@@ -24,7 +24,7 @@ func GetKeyForObject[T any, PT types.Object[T]](o PT) string {
 func GetObjectForKey(key string) (string, string) {
 	list := strings.Split(key, "/")
 
-	if len(list) == 0 {
+	if len(list) == 1 {
 		return "", list[0]
 	} else {
 		return list[0], list[1]
