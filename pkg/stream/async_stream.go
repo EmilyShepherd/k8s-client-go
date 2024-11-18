@@ -58,6 +58,10 @@ func (sd *AsyncStream[T]) Stop() {
 	sd.lock.Lock()
 	defer sd.lock.Unlock()
 
+	if sd.stopped {
+		return
+	}
+
 	close(sd.result)
 
 	// If the stream we've been given can be closed, we'll call that as
