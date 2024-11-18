@@ -32,10 +32,14 @@ func NewController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) (*Con
 	return c.Watches(IndexChan[T](watcher, util.GetKeyForObject[T])), nil
 }
 
+func (c *Controller[T, PT]) Notify(key string) {
+	c.queue.Add(key)
+}
+
 func (c *Controller[T, PT]) Watches(r chan string) *Controller[T, PT] {
 	go func() {
 		for key := range r {
-			c.queue.Add(key)
+			c.Notify(key)
 		}
 	}()
 
