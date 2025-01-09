@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"k8s.io/client-go/util/workqueue"
 
 	"github.com/EmilyShepherd/k8s-client-go/pkg/util"
@@ -46,9 +44,11 @@ func (c *Controller[T, PT]) Watches(r chan string) *Controller[T, PT] {
 	return c
 }
 
-type RunAction[T any] func(T) error
+func (c *Controller[T, PT]) Run(action RunHandler[T]) {
+	c.Reconcile(&FuncHandler[T]{action})
+}
 
-func (c *Controller[T, PT]) Run(action RunAction[T]) {
+func (c *Controller[T, PT]) Reconcile(r Reconciller[T]) {
 	for {
 		key, quit := c.queue.Get()
 		if quit {
@@ -57,11 +57,15 @@ func (c *Controller[T, PT]) Run(action RunAction[T]) {
 
 		ns, name := util.GetObjectForKey(key)
 		element, err := c.api.Get(ns, name, types.GetOptions{})
-		if err != nil {
-			fmt.Printf("ERROR %s\n", err)
+		if err == nil {
+			r.Reconcile(element)
+		} else {
+			// If the reconciller explictly cares about element deletions, we
+			// will notify it. Otherwise deletion events are ignored.
+			if remover, ok := r.(RemoveReconciller); ok {
+				remover.Remove(ns, name)
+			}
 		}
-
-		action(element)
 
 		c.queue.Done(key)
 	}
