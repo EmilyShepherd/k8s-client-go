@@ -39,6 +39,10 @@ func (sd *AsyncStream[T]) Stopped() bool {
 
 func (sd *AsyncStream[T]) run() {
 	for {
+		if sd.stopped {
+			return
+		}
+
 		result, err := sd.stream.Next()
 
 		if sd.stopped {
