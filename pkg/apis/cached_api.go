@@ -25,7 +25,6 @@ func NewCachedAPI[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], name
 func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
 	p := pipeWatcher[T, PT]{
 		result:    make(chan types.Event[T, PT]),
-		parent:    i,
 		namespace: namespace,
 		selectors: opts.LabelSelector,
 	}

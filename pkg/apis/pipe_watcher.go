@@ -6,7 +6,6 @@ import (
 
 type pipeWatcher[T any, PT types.Object[T]] struct {
 	result    chan types.Event[T, PT]
-	parent    *CachedAPI[T, PT]
 	namespace string
 	selectors []types.LabelSelector
 }
