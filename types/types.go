@@ -72,6 +72,10 @@ type WatchInterface[T any, PT Object[T]] interface {
 	// or Stop() is called, this channel will be closed, in which case the
 	// Watch should be completely cleaned up.
 	ResultChan() <-chan Event[T, PT]
+
+	Next() (Event[T, PT], error)
+
+	Error() error
 }
 
 // ObjectAPI wraps all operations on object.
