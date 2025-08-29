@@ -12,6 +12,7 @@ type ResourceCache[T any, PT types.Object[T]] struct {
 	items    map[string]T
 	watchers []pipeWatcher[T, PT]
 	itemLock sync.RWMutex
+	ready    bool
 }
 
 func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], namespace string, opts types.ListOptions) (*ResourceCache[T, PT], error) {
@@ -37,12 +38,28 @@ func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], 
 	api.watcher = watcher
 
 	go func() {
-		for result := range api.watcher.ResultChan() {
-			api.processEvent(result)
+		for {
+			result, err := api.watcher.Next()
+			if err == nil {
+				api.processEvent(result)
+			} else {
+				api.ready = false
+				return
+			}
 		}
 	}()
 
+	api.ready = true
+
 	return &api, nil
+}
+
+func (i *ResourceCache[T, PT]) IsReady() bool {
+	return i.ready
+}
+
+func (i *ResourceCache[T, PT]) Error() error {
+	return i.watcher.Error()
 }
 
 func (i *ResourceCache[T, PT]) get(key string) (T, bool) {
