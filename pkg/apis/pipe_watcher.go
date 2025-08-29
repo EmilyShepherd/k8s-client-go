@@ -5,23 +5,20 @@ import (
 )
 
 type pipeWatcher[T any, PT types.Object[T]] struct {
-	input     chan types.Event[T, PT]
 	result    chan types.Event[T, PT]
 	parent    *CachedAPI[T, PT]
 	namespace string
 	selectors []types.LabelSelector
 }
 
-func (p *pipeWatcher[T, PT]) run() {
-	for event := range p.input {
-		if Matches(p.namespace, p.selectors, PT(&event.Object)) {
-			p.result <- event
-		}
+func (p *pipeWatcher[T, PT]) Event(event types.Event[T, PT]) {
+	if Matches(p.namespace, p.selectors, PT(&event.Object)) {
+		p.result <- event
 	}
 }
 
 func (p *pipeWatcher[T, PT]) Stop() {
-	//
+	close(p.result)
 }
 
 func (p *pipeWatcher[T, PT]) ResultChan() <-chan types.Event[T, PT] {

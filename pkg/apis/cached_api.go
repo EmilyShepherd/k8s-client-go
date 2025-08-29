@@ -24,7 +24,6 @@ func NewCachedAPI[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], name
 
 func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
 	p := pipeWatcher[T, PT]{
-		input:     make(chan types.Event[T, PT]),
 		result:    make(chan types.Event[T, PT]),
 		parent:    i,
 		namespace: namespace,
@@ -34,16 +33,15 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 	go func() {
 		for _, item := range i.cache.all() {
 			if Matches(namespace, opts.LabelSelector, PT(&item)) {
-				p.input <- types.Event[T, PT]{
+				p.Event(types.Event[T, PT]{
 					Type:   types.EventTypeAdded,
 					Object: item,
-				}
+				})
 			}
 		}
 	}()
 
-	go p.run()
-	i.cache.watchers = append(i.cache.watchers, p)
+	i.cache.watchers = append(i.cache.watchers, &p)
 
 	return &p, nil
 }

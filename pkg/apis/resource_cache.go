@@ -7,10 +7,15 @@ import (
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
+type EventListener[T any, PT types.Object[T]] interface {
+	Event(types.Event[T, PT])
+	Stop()
+}
+
 type ResourceCache[T any, PT types.Object[T]] struct {
 	watcher  types.WatchInterface[T, PT]
 	items    map[string]T
-	watchers []pipeWatcher[T, PT]
+	watchers []EventListener[T, PT]
 	itemLock sync.RWMutex
 	ready    bool
 }
@@ -44,6 +49,11 @@ func NewResourceCache[T any, PT types.Object[T]](rawApi types.ObjectAPI[T, PT], 
 				api.processEvent(result)
 			} else {
 				api.ready = false
+
+				for _, watcher := range api.watchers {
+					watcher.Stop()
+				}
+
 				return
 			}
 		}
@@ -89,6 +99,6 @@ func (i *ResourceCache[T, PT]) processEvent(e types.Event[T, PT]) {
 	i.itemLock.Unlock()
 
 	for _, watcher := range i.watchers {
-		watcher.input <- e
+		watcher.Event(e)
 	}
 }
