@@ -80,11 +80,17 @@ func (i *ResourceCache[T, PT]) get(key string) (T, bool) {
 	return found, ok
 }
 
-func (i *ResourceCache[T, PT]) all() map[string]T {
-	i.itemLock.RLock()
-	defer i.itemLock.RUnlock()
+func (i *ResourceCache[T, PT]) RegisterListener(listener EventListener[T, PT]) {
+	i.itemLock.Lock()
+	defer i.itemLock.Unlock()
 
-	return i.items
+	for _, item := range i.items {
+		listener.Event(types.Event[T, PT]{
+			Type:   types.EventTypeAdded,
+			Object: item,
+		})
+	}
+	i.watchers = append(i.watchers, listener)
 }
 
 func (i *ResourceCache[T, PT]) processEvent(e types.Event[T, PT]) {

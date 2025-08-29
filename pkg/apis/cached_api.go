@@ -30,18 +30,7 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 		selectors: opts.LabelSelector,
 	}
 
-	go func() {
-		for _, item := range i.cache.all() {
-			if Matches(namespace, opts.LabelSelector, PT(&item)) {
-				p.Event(types.Event[T, PT]{
-					Type:   types.EventTypeAdded,
-					Object: item,
-				})
-			}
-		}
-	}()
-
-	i.cache.watchers = append(i.cache.watchers, &p)
+	go i.cache.RegisterListener(&p)
 
 	return &p, nil
 }
