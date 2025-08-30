@@ -43,5 +43,5 @@ func (n *Notifier[T, PT]) Event(event types.Event[T, PT]) {
 }
 
 func (n *Notifier[T, PT]) Stop() {
-	n.parent.queue.ShutDown()
+	n.parent.Stop()
 }

@@ -40,9 +40,15 @@ func (c *Controller[T, PT]) Watches(r chan string) *Controller[T, PT] {
 		for key := range r {
 			c.Notify(key)
 		}
+
+		c.Stop()
 	}()
 
 	return c
+}
+
+func (c *Controller[T, PT]) Stop() {
+	c.queue.ShutDown()
 }
 
 func (c *Controller[T, PT]) Run(action RunHandler[T]) {
