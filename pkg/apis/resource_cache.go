@@ -72,7 +72,7 @@ func (i *ResourceCache[T, PT]) Error() error {
 	return i.watcher.Error()
 }
 
-func (i *ResourceCache[T, PT]) get(key string) (T, bool) {
+func (i *ResourceCache[T, PT]) Get(key string) (T, bool) {
 	i.itemLock.RLock()
 	defer i.itemLock.RUnlock()
 
