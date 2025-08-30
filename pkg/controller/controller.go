@@ -3,31 +3,32 @@ package controller
 import (
 	"k8s.io/client-go/util/workqueue"
 
+	"github.com/EmilyShepherd/k8s-client-go/pkg/apis"
 	"github.com/EmilyShepherd/k8s-client-go/pkg/util"
 	"github.com/EmilyShepherd/k8s-client-go/types"
 )
 
 type Controller[T any, PT types.Object[T]] struct {
-	api   types.ObjectAPI[T, PT]
-	queue workqueue.TypedRateLimitingInterface[string]
+	resource *apis.ResourceCache[T, PT]
+	queue    workqueue.TypedRateLimitingInterface[string]
 }
 
-func NewEmptyController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) *Controller[T, PT] {
+func NewEmptyController[T any, PT types.Object[T]](root *apis.ResourceCache[T, PT]) *Controller[T, PT] {
 	return &Controller[T, PT]{
-		api:   root,
-		queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		resource: root,
+		queue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 	}
 }
 
-func NewController[T any, PT types.Object[T]](root types.ObjectAPI[T, PT]) (*Controller[T, PT], error) {
+func NewController[T any, PT types.Object[T]](root *apis.ResourceCache[T, PT]) *Controller[T, PT] {
 	c := NewEmptyController[T, PT](root)
 
-	watcher, err := root.Watch("", "", types.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
+	root.RegisterListener(&Notifier[T, PT]{
+		parent:  c,
+		indexer: util.GetKeyForObject[T, PT],
+	})
 
-	return c.Watches(IndexChan[T](watcher, util.GetKeyForObject[T])), nil
+	return c
 }
 
 func (c *Controller[T, PT]) Notify(key string) {
@@ -55,14 +56,14 @@ func (c *Controller[T, PT]) Reconcile(r Reconciller[T]) {
 			return
 		}
 
-		ns, name := util.GetObjectForKey(key)
-		element, err := c.api.Get(ns, name, types.GetOptions{})
-		if err == nil {
+		element, found := c.resource.Get(key)
+		if found {
 			r.Reconcile(element)
 		} else {
 			// If the reconciller explictly cares about element deletions, we
 			// will notify it. Otherwise deletion events are ignored.
 			if remover, ok := r.(RemoveReconciller); ok {
+				ns, name := util.GetObjectForKey(key)
 				remover.Remove(ns, name)
 			}
 		}
