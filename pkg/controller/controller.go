@@ -24,8 +24,8 @@ func NewController[T any, PT types.Object[T]](root *apis.ResourceCache[T, PT]) *
 	c := NewEmptyController[T, PT](root)
 
 	root.RegisterListener(&Notifier[T, PT]{
-		parent:  c,
-		indexer: util.GetKeyForObject[T, PT],
+		Parent:  c,
+		Indexer: util.GetKeyForObject[T, PT],
 	})
 
 	return c

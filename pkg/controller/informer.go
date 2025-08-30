@@ -33,15 +33,20 @@ func KeyFromLabel[T any, PT types.Object[T]](label string) Indexer[PT] {
 	}
 }
 
+type IndexListener interface {
+	Notify(string)
+	Stop()
+}
+
 type Notifier[T any, PT types.Object[T]] struct {
-	parent  *Controller[T, PT]
-	indexer Indexer[PT]
+	Parent  IndexListener
+	Indexer Indexer[PT]
 }
 
 func (n *Notifier[T, PT]) Event(event types.Event[T, PT]) {
-	n.parent.Notify(n.indexer(PT(&event.Object)))
+	n.Parent.Notify(n.Indexer(PT(&event.Object)))
 }
 
 func (n *Notifier[T, PT]) Stop() {
-	n.parent.Stop()
+	n.Parent.Stop()
 }
