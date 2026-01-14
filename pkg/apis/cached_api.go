@@ -41,7 +41,7 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 // Returns an item in the cached collection
 func (i *CachedAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
 	key := util.GetKey(namespace, name)
-	item, found := i.cache.items[key]
+	item, found := i.cache.Get(key)
 	if !found {
 		return item, fmt.Errorf("Could not find object %s", key)
 	}
@@ -55,11 +55,13 @@ func (i *CachedAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T
 func (i *CachedAPI[T, PT]) List(namespace string, opts types.ListOptions) (*types.List[T, PT], error) {
 	list := types.List[T, PT]{}
 
+	i.cache.itemLock.RLock()
 	for _, item := range i.cache.items {
 		if Matches(namespace, opts.LabelSelector, PT(&item)) {
 			list.Items = append(list.Items, item)
 		}
 	}
+	i.cache.itemLock.RUnlock()
 
 	return &list, nil
 }
