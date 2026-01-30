@@ -32,7 +32,7 @@ func NewController[T any, PT types.Object[T]](root *apis.ResourceCache[T, PT]) *
 }
 
 func (c *Controller[T, PT]) Notify(key string) {
-	c.queue.Add(key)
+	c.queue.AddRateLimited(key)
 }
 
 func (c *Controller[T, PT]) Watches(r chan string) *Controller[T, PT] {
@@ -64,7 +64,12 @@ func (c *Controller[T, PT]) Reconcile(r Reconciller[T]) {
 
 		element, found := c.resource.Get(key)
 		if found {
-			r.Reconcile(element)
+			err := r.Reconcile(element)
+			if err == nil {
+				// When a success occurs we have to clear the item from the rate
+				// limiter. This resets any failures or requeues it has previously had.
+				c.queue.Forget(key)
+			}
 		} else {
 			// If the reconciller explictly cares about element deletions, we
 			// will notify it. Otherwise deletion events are ignored.
