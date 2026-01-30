@@ -69,6 +69,9 @@ func (c *Controller[T, PT]) Reconcile(r Reconciller[T]) {
 				// When a success occurs we have to clear the item from the rate
 				// limiter. This resets any failures or requeues it has previously had.
 				c.queue.Forget(key)
+			} else {
+				// When a failure occurs we will requeue it for a retry
+				c.Notify(key)
 			}
 		} else {
 			// If the reconciller explictly cares about element deletions, we
