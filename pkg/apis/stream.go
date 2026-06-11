@@ -20,6 +20,7 @@ type ResponseDecoder interface {
 // and will attempt to gracefully reconnect when watch connections
 // time out.
 type Watcher[T any, PT types.Object[T]] struct {
+	running         bool
 	closer          io.Closer
 	decoder         ResponseDecoder
 	api             *client.Client
@@ -29,7 +30,7 @@ type Watcher[T any, PT types.Object[T]] struct {
 
 // [Close] closes the underlying response body io.ReadCloser
 func (sw *Watcher[T, PT]) Close() error {
-	sw.decoder = nil
+	sw.running = false
 
 	return sw.closer.Close()
 }
@@ -46,6 +47,7 @@ func (sw *Watcher[T, PT]) doWatch() error {
 
 	sw.closer = resp.Body
 	sw.decoder = json.NewDecoder(resp.Body)
+	sw.running = true
 
 	return nil
 }
@@ -54,6 +56,11 @@ func (sw *Watcher[T, PT]) doWatch() error {
 func (sw *Watcher[T, PT]) Next() (types.Event[T, PT], error) {
 	for {
 		var evt types.Event[T, PT]
+
+		if !sw.running {
+			return evt, nil
+		}
+
 		err := sw.decoder.Decode(&evt)
 
 		switch err {
@@ -66,10 +73,7 @@ func (sw *Watcher[T, PT]) Next() (types.Event[T, PT], error) {
 		// Graceful closure of the underlying io.Reader, normally caused by
 		// a timeout. Attempt to reconnect.
 		case io.EOF:
-			// If the decoder is nil, we can't restart and should just return.
-			// This will either happen if you call Next() before intially
-			// starting the watcher, or because it has been explictly Closed()
-			if sw.decoder == nil {
+			if !sw.running {
 				return evt, err
 			}
 
