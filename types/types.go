@@ -64,9 +64,12 @@ type List[T any, PT Object[T]] struct {
 	Items           []T `json:"items"`
 }
 
+type UntilChecker[T any, PT Object[T]] func(Event[T, PT]) bool
+
 type Watcher[T any, PT Object[T]] interface {
 	io.Closer
 	Next() (Event[T, PT], error)
+	Until(cb UntilChecker[T, PT]) (Event[T, PT], error)
 }
 
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.

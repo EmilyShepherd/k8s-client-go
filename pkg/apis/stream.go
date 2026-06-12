@@ -88,3 +88,16 @@ func (sw *Watcher[T, PT]) Next() (types.Event[T, PT], error) {
 		}
 	}
 }
+
+// Watches until an event matches the given condition checker, at which point the event
+// is returned and the watch is stopped
+func (sw *Watcher[T, PT]) Until(cb types.UntilChecker[T, PT]) (evt types.Event[T, PT], err error) {
+	defer sw.Close()
+
+	for {
+		evt, err = sw.Next()
+		if err != nil || cb(evt) {
+			return
+		}
+	}
+}
