@@ -1,6 +1,8 @@
 package types
 
 import (
+	"io"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -62,18 +64,20 @@ type List[T any, PT Object[T]] struct {
 	Items           []T `json:"items"`
 }
 
+type Watcher[T any, PT Object[T]] interface {
+	io.Closer
+	Next() (Event[T, PT], error)
+}
+
 // WatchInterface can be implemented by anything that knows how to Watch and report changes.
 type WatchInterface[T any, PT Object[T]] interface {
-	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
-	// any resources used by the Watch.
+	Next() (Event[T, PT], error)
 	Stop()
 
 	// ResultChan returns a chan which will receive all the events. If an error occurs
 	// or Stop() is called, this channel will be closed, in which case the
 	// Watch should be completely cleaned up.
 	ResultChan() <-chan Event[T, PT]
-
-	Next() (Event[T, PT], error)
 
 	Error() error
 }
@@ -82,6 +86,7 @@ type WatchInterface[T any, PT Object[T]] interface {
 type ObjectAPI[T any, PT Object[T]] interface {
 	Get(namespace, name string, _ GetOptions) (T, error)
 	Watch(namespace, name string, _ ListOptions) (WatchInterface[T, PT], error)
+	WatchSync(namespace, name string, _ ListOptions) (Watcher[T, PT], error)
 	List(namespace string, _ ListOptions) (*List[T, PT], error)
 	Apply(namespace, name, fieldManager string, force bool, item T) (T, error, EventType)
 	Patch(namespace, name, fieldManager string, item T) (T, error)

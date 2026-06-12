@@ -38,6 +38,10 @@ func (i *CachedAPI[T, PT]) Watch(name, namespace string, opts types.ListOptions)
 	return &p, nil
 }
 
+func (i *CachedAPI[T, PT]) WatchSync(name, namespace string, opts types.ListOptions) (types.Watcher[T, PT], error) {
+	return nil, nil
+}
+
 // Returns an item in the cached collection
 func (i *CachedAPI[T, PT]) Get(namespace, name string, opts types.GetOptions) (T, error) {
 	key := util.GetKey(namespace, name)

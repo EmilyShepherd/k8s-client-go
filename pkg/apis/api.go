@@ -152,7 +152,7 @@ func (o *objectAPI[T, PT]) Patch(namespace, name, fieldManager string, item T) (
 	return t, err
 }
 
-func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
+func (o *objectAPI[T, PT]) WatchSync(namespace, name string, opts types.ListOptions) (types.Watcher[T, PT], error) {
 	req := client.ResourceRequest{
 		Namespace: namespace,
 		Values:    make(url.Values, len(opts.LabelSelector)+1),
@@ -180,6 +180,15 @@ func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions)
 		resourceVersion: opts.ResourceVersion,
 	}
 	if err := watch.doWatch(); err != nil {
+		return nil, err
+	}
+
+	return watch, nil
+}
+
+func (o *objectAPI[T, PT]) Watch(namespace, name string, opts types.ListOptions) (types.WatchInterface[T, PT], error) {
+	watch, err := o.WatchSync(namespace, name, opts)
+	if err != nil {
 		return nil, err
 	}
 
