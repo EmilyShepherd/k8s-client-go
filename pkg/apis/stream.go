@@ -101,3 +101,11 @@ func (sw *Watcher[T, PT]) Until(cb types.UntilChecker[T, PT]) (evt types.Event[T
 		}
 	}
 }
+
+// Creates an Until checker from a callback that is only interested in the inner
+// object, rather than the wrapping event itself.
+func UnwrapEvent[T any, PT types.Object[T]](cb func(T) bool) types.UntilChecker[T, PT] {
+	return func(evt types.Event[T, PT]) bool {
+		return cb(evt.Object)
+	}
+}
